@@ -1,22 +1,38 @@
-import { createClient } from '@supabase/supabase-js';
+const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
 
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
+export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+async function postgrest(path, { method = 'GET', body } = {}) {
+  if (!isSupabaseConfigured) throw new Error('Database not configured');
 
-export const supabase = isSupabaseConfigured ? createClient(supabaseUrl, supabaseAnonKey) : null;
+  const headers = {
+    apikey: SUPABASE_ANON_KEY,
+    'Content-Type': 'application/json',
+  };
+  if (method === 'POST') headers.Prefer = 'return=representation';
+
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    const short = detail.slice(0, 300);
+    throw new Error(`Database error (${res.status})${short ? `: ${short}` : ''}`);
+  }
+
+  return res.json();
+}
 
 export async function saveItinerary(payload) {
-  if (!supabase) throw new Error('Database not configured');
-  const { data, error } = await supabase.from('itineraries').insert([payload]).select('id').single();
-  if (error) throw error;
-  return data;
+  const rows = await postgrest('itineraries', { method: 'POST', body: payload });
+  return rows[0] || {};
 }
 
 export async function fetchItinerary(id) {
-  if (!supabase) throw new Error('Database not configured');
-  const { data, error } = await supabase.from('itineraries').select('*').eq('id', id).single();
-  if (error) throw error;
-  return data;
+  const rows = await postgrest(`itineraries?select=*&id=eq.${encodeURIComponent(id)}`);
+  return rows[0] || null;
 }
