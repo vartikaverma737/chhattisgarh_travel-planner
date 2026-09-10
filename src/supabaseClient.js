@@ -30,3 +30,7 @@ export async function fetchItinerary(id) {
   const rows = await postgrest('GET', `get-itinerary?id=${encodeURIComponent(id)}`, null);
   return (Array.isArray(rows) ? rows[0] : rows) || null;
 }
+
+export async function listItineraries(limit = 50) {
+  return postgrest('GET', `list-itineraries?limit=${limit}`, null);
+}

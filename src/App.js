@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Calendar, Sun, Cloud, Menu, X, Search, Heart, Share2, Mountain, Camera, TreePine, Map, Navigation, Clock, Info, Users, Wallet, Sparkles, TrendingUp, ArrowRight, Check, Filter, Star, Phone, Globe, Save, Link2, Copy, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Calendar, Sun, Cloud, Menu, X, Search, Heart, Share2, Mountain, Camera, TreePine, Map, Navigation, Clock, Info, Users, Wallet, Sparkles, TrendingUp, ArrowRight, Check, Filter, Star, Phone, Globe, Save, Link2, Copy, Loader2, Bookmark } from 'lucide-react';
 
 // ── STEP 1: Gallery imports ───────────────────────────────────────────────────
 import { PLACE_IMAGES, getPlaceImages } from './placeimage';
 import { PlaceImageCarousel, PlaceImageGrid, ImageLightbox } from './imagegallery';
-import { saveItinerary, fetchItinerary, isSupabaseConfigured } from './supabaseClient';
+import { saveItinerary, fetchItinerary, listItineraries, isSupabaseConfigured } from './supabaseClient';
 
 const CTB = 'https://portal-tourism.cgstate.gov.in/files/';
 const WM = 'https://upload.wikimedia.org/wikipedia/commons/thumb/';
@@ -428,6 +428,10 @@ export default function AITripPlanner() {
   const [savedTrip, setSavedTrip] = useState(null);
   const [savedTripLoading, setSavedTripLoading] = useState(false);
   const [savedTripError, setSavedTripError] = useState('');
+  const [myTripsOpen, setMyTripsOpen] = useState(false);
+  const [myTrips, setMyTrips] = useState([]);
+  const [myTripsLoading, setMyTripsLoading] = useState(false);
+  const [myTripsError, setMyTripsError] = useState('');
 
   const districts = ALL_DISTRICTS;
 
@@ -615,6 +619,38 @@ export default function AITripPlanner() {
     }
   };
 
+  const loadMyTrips = async () => {
+    setMyTripsOpen(true);
+    setMyTripsLoading(true);
+    setMyTripsError('');
+    try {
+      const rows = await listItineraries(50);
+      setMyTrips(Array.isArray(rows) ? rows : []);
+    } catch (err) {
+      setMyTripsError(err.message || 'Could not load saved itineraries.');
+    } finally {
+      setMyTripsLoading(false);
+    }
+  };
+
+  const openSavedTrip = async (id) => {
+    setMyTripsOpen(false);
+    setSavedTripLoading(true);
+    setSavedTripError('');
+    try {
+      const data = await fetchItinerary(id);
+      if (data && data.itinerary) {
+        setSavedTrip({ ...data, url: buildShareUrl(data.id) });
+      } else {
+        setSavedTripError('Itinerary not found.');
+      }
+    } catch (err) {
+      setSavedTripError(err.message || 'Could not load itinerary.');
+    } finally {
+      setSavedTripLoading(false);
+    }
+  };
+
   const TRIBAL_DISTRICTS = new Set(['Bastar','Kondagaon','Narayanpur','Dantewada','Kanker','Sukma','Bijapur','Surguja','Jashpur','Korea','Kabirdham','Raigarh']);
   const filteredDestinations = selectedCategory === 'all' ? districts
     : selectedCategory === 'tribal' ? districts.filter(d => TRIBAL_DISTRICTS.has(d.name))
@@ -768,6 +804,9 @@ export default function AITripPlanner() {
           <button onClick={() => setShowTripPlanner(true)} className={`hidden md:flex items-center gap-2 px-6 py-2 rounded-full font-semibold transition-all ${scrolled ? 'bg-gradient-to-r from-orange-500 to-red-600 text-white hover:shadow-lg' : 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-md'}`}>
             <Sparkles size={20} />Plan My Trip
           </button>
+          <button onClick={loadMyTrips} className={`hidden md:flex items-center gap-2 px-5 py-2 rounded-full font-semibold transition-all border ${scrolled ? 'border-orange-200 text-orange-700 hover:bg-orange-50' : 'border-white/30 text-white hover:bg-white/10 backdrop-blur-md'}`}>
+            <Bookmark size={18} />My Trips
+          </button>
           <button onClick={() => setMenuOpen(!menuOpen)} className={`md:hidden p-2 rounded-lg ${scrolled ? 'text-gray-800' : 'text-white'}`}>
             {menuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
@@ -777,6 +816,7 @@ export default function AITripPlanner() {
             {['Destinations', 'Plan Trip'].map(item => (
               <a key={item} href="#" onClick={e => { e.preventDefault(); if (item === 'Plan Trip') setShowTripPlanner(true); setMenuOpen(false); }} className="block py-2 text-gray-700 hover:text-orange-500 font-medium">{item}</a>
             ))}
+            <button onClick={() => { loadMyTrips(); setMenuOpen(false); }} className="flex items-center gap-2 w-full text-left py-2 text-gray-700 hover:text-orange-500 font-medium"><Bookmark size={18} />My Trips</button>
           </div>
         )}
       </nav>
@@ -1348,6 +1388,46 @@ export default function AITripPlanner() {
           startIndex={lightbox.startIndex}
           onClose={() => setLightbox(null)}
         />
+      )}
+
+      {/* ── My Trips list modal ── */}
+      {myTripsOpen && (
+        <div className="fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[80vh] flex flex-col detail-modal">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold flex items-center gap-2"><Bookmark className="text-orange-500" size={22} />My Saved Trips</h3>
+              <button onClick={() => setMyTripsOpen(false)} className="p-2 hover:bg-gray-100 rounded-full"><X size={20} /></button>
+            </div>
+            {myTripsLoading ? (
+              <div className="flex-1 flex items-center justify-center py-12"><Loader2 size={32} className="text-orange-500 animate-spin" /></div>
+            ) : myTripsError ? (
+              <div className="flex-1 flex flex-col items-center justify-center py-12 text-center">
+                <p className="text-gray-500 text-sm mb-4">{myTripsError}</p>
+                <button onClick={loadMyTrips} className="text-orange-600 font-semibold hover:underline">Try again</button>
+              </div>
+            ) : myTrips.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center py-12 text-center">
+                <p className="text-4xl mb-3">🗺️</p>
+                <p className="text-gray-600 font-semibold mb-1">No saved trips yet</p>
+                <p className="text-gray-400 text-sm">Generate an itinerary and save it to see it here.</p>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto space-y-3">
+                {myTrips.map(trip => (
+                  <button key={trip.id} onClick={() => openSavedTrip(trip.id)} className="w-full text-left p-4 border border-gray-200 rounded-xl hover:border-orange-300 hover:bg-orange-50 transition-all">
+                    <p className="font-bold text-gray-800 mb-1">{trip.name || 'Untitled Trip'}</p>
+                    <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+                      {trip.days && <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{trip.days} day{trip.days !== 1 ? 's' : ''}</span>}
+                      {trip.starting_district && <span className="bg-orange-50 text-orange-700 px-2 py-0.5 rounded-full">{trip.starting_district}</span>}
+                      {trip.group_type && <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">{trip.group_type}</span>}
+                      {trip.created_at && <span className="text-gray-400">{new Date(trip.created_at).toLocaleDateString()}</span>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* ── STEP 6: Save Itinerary modal ── */}
