@@ -825,6 +825,21 @@ export const PLACE_IMAGES = {
     `${CTB}Ruined_temple_near_Rani_Talab,_Dipadih_Kusmi_Dipadih_Chattisgarh_036.jpg`,
     `${CTB}gangrel-bandh-image.webp`,
   ],
+  'Naya Raipur Central Park': [
+    `${WMF}1/13/Central_Park%2C_Sector_24_Naya_Raipur.png`,
+    `${CTB}001%20(2).jpg`,
+    `${CTB}3%20(2).jpg`,
+    `${CTB}4.jpg`,
+    `${CTB}gangrel-bandh-image.webp`,
+  ],
+  'Shaheed Veer Narayan Singh International Stadium': [
+    `${WM}4/4a/Shaheed_Veer_Narayan_Singh_International_Stadium_Raipur.jpg/960px-Shaheed_Veer_Narayan_Singh_International_Stadium_Raipur.jpg`,
+    `${WMF}5/5e/Shaheed_Veer_Narayan_International_Cricket_Stadium_Raipur%2C_drone_view.png`,
+    `${CTB}001%20(2).jpg`,
+    `${CTB}3%20(2).jpg`,
+    `${CTB}4.jpg`,
+    `${CTB}gangrel-bandh-image.webp`,
+  ],
 };
 
 // ─── HELPER: get images array for a place ────────────────────────────────────
