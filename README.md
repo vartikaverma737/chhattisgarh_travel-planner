@@ -1,4 +1,4 @@
-# Chhattisgarh Travel Planner (cg-tourism-frontend)
+# Chhattisgarh Travel Planner 
 
 Chhattisgarh tourism destination preview app built with React and Tailwind CSS.
 
