@@ -157,6 +157,7 @@ export const PLACE_IMAGES = {
     `${CTB}Bastar%20Dussehra%20(6).jpg`,
   ],
   'Anthropological Museum Jagdalpur': [
+    `https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ec/%E0%A6%9C%E0%A6%97%E0%A6%A6%E0%A6%B2%E0%A6%AA%E0%A7%81%E0%A6%B0_%E0%A6%AF%E0%A6%BE%E0%A6%A6%E0%A7%81%E0%A6%98%E0%A6%B0_%E0%A7%A7%E0%A7%AF.jpg/960px-%E0%A6%9C%E0%A6%97%E0%A6%A6%E0%A6%B2%E0%A6%AA%E0%A7%81%E0%A6%B0_%E0%A6%AF%E0%A6%BE%E0%A6%A6%E0%A7%81%E0%A6%98%E0%A6%B0_%E0%A7%A7%E0%A7%AF.jpg`,
     `${CTB}001a7d7f9.jpg`,
     `${CTB}Bastar%20Dussehra%20(6).jpg`,
     `${CTB}Bhatra%20Tribe%20Women%20of%20Bastar.jpg`,
@@ -725,6 +726,7 @@ export const PLACE_IMAGES = {
     `${CTB}gangrel-bandh-image.webp`,
   ],
   'Abujhmaria Village Visit': [
+    `${WMF}9/91/Gadiya_village_road%2C_Bastar_Chhattisgarh_India.jpg`,
     `${CTB}Bhatra%20Tribe%20Women%20of%20Bastar.jpg`,
     `${CTB}001a7d7f9.jpg`,
     `${CTB}Bastar%20Dussehra%20(6).jpg`,
@@ -801,6 +803,7 @@ export const PLACE_IMAGES = {
     `${CTB}gangrel-bandh-image.webp`,
   ],
   'Dornapal Tribal Village': [
+    `${WMF}c/cd/Tribal_Woman_at_Weekly_Village_Market.jpg`,
     `${CTB}Bhatra%20Tribe%20Women%20of%20Bastar.jpg`,
     `${CTB}001a7d7f9.jpg`,
     `${CTB}Bastar%20Dussehra%20(6).jpg`,
@@ -944,12 +947,15 @@ const RAIPUR_NEW_IMAGES = {
     `${CTB}4.jpg`,
   ],
   'Naya Raipur Central Park': [
+    `${WMF}1/13/Central_Park%2C_Sector_24_Naya_Raipur.png`,
     `${CTB}001%20(2).jpg`,
     `${CTB}3%20(2).jpg`,
     `${CTB}4.jpg`,
     `${CTB}gangrel-bandh-image.webp`,
   ],
   'Shaheed Veer Narayan Singh International Stadium': [
+    `${WM}4/4a/Shaheed_Veer_Narayan_Singh_International_Stadium_Raipur.jpg/960px-Shaheed_Veer_Narayan_Singh_International_Stadium_Raipur.jpg`,
+    `${WMF}5/5e/Shaheed_Veer_Narayan_International_Cricket_Stadium_Raipur%2C_drone_view.png`,
     `${CTB}001%20(2).jpg`,
     `${CTB}3%20(2).jpg`,
     `${CTB}4.jpg`,
