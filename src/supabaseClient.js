@@ -34,3 +34,7 @@ export async function fetchItinerary(id) {
 export async function listItineraries(limit = 50) {
   return postgrest('GET', `list-itineraries?limit=${limit}`, null);
 }
+
+export async function deleteItinerary(id) {
+  return postgrest('DELETE', `delete-itinerary?id=${encodeURIComponent(id)}`, null);
+}

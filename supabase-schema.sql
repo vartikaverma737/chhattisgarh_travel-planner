@@ -27,3 +27,22 @@ create policy "itineraries_public_select"
   on public.itineraries
   for select
   using (true);
+
+drop policy if exists "itineraries_public_delete" on public.itineraries;
+create policy "itineraries_public_delete"
+  on public.itineraries
+  for delete
+  using (true);
+
+-- Clean up diagnostic/test rows created during development.
+delete from public.itineraries
+where name in (
+  'final_verify',
+  'live_verified',
+  'api_fn_test',
+  'node_fetch_browser_sim',
+  'browser_sim',
+  'apikey_only_test',
+  'node test',
+  '__test_itinerary__'
+);
