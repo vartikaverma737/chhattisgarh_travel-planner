@@ -6,8 +6,13 @@ export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 async function postgrest(path, { method = 'GET', body } = {}) {
   if (!isSupabaseConfigured) throw new Error('Database not configured');
 
+  // Header values must be ASCII (ISO-8859-1). Strip any hidden non-ASCII
+  // characters (e.g. zero-width spaces copied from a dashboard) so they can
+  // never break fetch().
+  const latin1 = (v) => String(v || '').replace(/[^\x00-\xFF]/g, '');
+
   const headers = {
-    apikey: SUPABASE_ANON_KEY,
+    apikey: latin1(SUPABASE_ANON_KEY),
     'Content-Type': 'application/json',
   };
   if (method === 'POST') headers.Prefer = 'return=representation';

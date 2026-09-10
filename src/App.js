@@ -1336,7 +1336,7 @@ export default function AITripPlanner() {
               <div className="flex gap-2"><input type="email" placeholder="Your email" className="flex-1 px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 focus:outline-none focus:border-orange-500 text-sm" /><button className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-600 rounded-lg font-semibold text-sm">Go</button></div>
             </div>
           </div>
-          <div className="border-t border-gray-700 pt-6 text-center text-gray-400 text-sm">© 2026 Chhattisgarh Tourism · Photos: CTB & Wikimedia Commons · Geographic routing powered by Haversine algorithm</div>
+          <div className="border-t border-gray-700 pt-6 text-center text-gray-400 text-sm">© 2026 Chhattisgarh Tourism · Photos: CTB & Wikimedia Commons · Geographic routing powered by Haversine algorithm <span className="text-gray-600">· build v3-direct-rest</span></div>
         </div>
       </footer>
 
