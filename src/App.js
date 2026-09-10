@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Calendar, Sun, Cloud, Menu, X, Search, Heart, Share2, Mountain, Camera, TreePine, Map, Navigation, Clock, Info, Users, Wallet, Sparkles, TrendingUp, ArrowRight, Check, Filter, Star, Phone, Globe } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Calendar, Sun, Cloud, Menu, X, Search, Heart, Share2, Mountain, Camera, TreePine, Map, Navigation, Clock, Info, Users, Wallet, Sparkles, TrendingUp, ArrowRight, Check, Filter, Star, Phone, Globe, Save, Link2, Copy, Loader2 } from 'lucide-react';
 
 // ── STEP 1: Gallery imports ───────────────────────────────────────────────────
 import { PLACE_IMAGES, getPlaceImages } from './placeimage';
 import { PlaceImageCarousel, PlaceImageGrid, ImageLightbox } from './imagegallery';
+import { saveItinerary, fetchItinerary, isSupabaseConfigured } from './supabaseClient';
 
 const CTB = 'https://portal-tourism.cgstate.gov.in/files/';
 const WM = 'https://upload.wikimedia.org/wikipedia/commons/thumb/';
@@ -417,6 +418,17 @@ export default function AITripPlanner() {
   // ── STEP 2: Lightbox state ──────────────────────────────────────────────────
   const [lightbox, setLightbox] = useState(null);
 
+  // ── STEP 3: Saved itinerary state ───────────────────────────────────────────
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [saveName, setSaveName] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [savedShareUrl, setSavedShareUrl] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [savedTrip, setSavedTrip] = useState(null);
+  const [savedTripLoading, setSavedTripLoading] = useState(false);
+  const [savedTripError, setSavedTripError] = useState('');
+
   const districts = ALL_DISTRICTS;
 
   function getDistrictColor(districtName) {
@@ -554,6 +566,54 @@ export default function AITripPlanner() {
     window.addEventListener('scroll', h);
     return () => window.removeEventListener('scroll', h);
   }, []);
+
+  // ── STEP 3: Load a shared itinerary from ?it=<id> in the URL ────────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('it');
+    if (!id) return;
+    setSavedTripLoading(true);
+    setSavedTripError('');
+    fetchItinerary(id)
+      .then((data) => { setSavedTrip(data); setSavedTripLoading(false); })
+      .catch((err) => { setSavedTripError(err.message || 'Could not load the saved itinerary.'); setSavedTripLoading(false); });
+  }, []);
+
+  const buildShareUrl = (id) => `${window.location.origin}${window.location.pathname}?it=${id}`;
+
+  const copyShareLink = () => {
+    if (!savedShareUrl) return;
+    navigator.clipboard.writeText(savedShareUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const handleSaveItinerary = async () => {
+    if (!saveName.trim() || !tripRecommendations) return;
+    const { interests, pace, budget, groupType } = tripPreferences;
+    setSaving(true);
+    setSaveError('');
+    try {
+      const data = await saveItinerary({
+        name: saveName.trim(),
+        starting_district: startingDistrict,
+        days: tripDuration,
+        pace,
+        budget,
+        group_type: groupType,
+        interests,
+        itinerary: tripRecommendations,
+      });
+      const url = buildShareUrl(data.id);
+      setSavedShareUrl(url);
+      setSavedTrip({ ...data, url });
+      setSaving(false);
+    } catch (err) {
+      setSaveError(isSupabaseConfigured ? (err.message || 'Could not save the itinerary.') : 'Database not configured. Add your Supabase URL and anon key to continue.');
+      setSaving(false);
+    }
+  };
 
   const TRIBAL_DISTRICTS = new Set(['Bastar','Kondagaon','Narayanpur','Dantewada','Kanker','Sukma','Bijapur','Surguja','Jashpur','Korea','Kabirdham','Raigarh']);
   const filteredDestinations = selectedCategory === 'all' ? districts
@@ -1248,8 +1308,8 @@ export default function AITripPlanner() {
                   </div>
                 )}
                 <div className="flex gap-4 justify-center flex-wrap">
-                  <button className="px-8 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full font-semibold hover:shadow-lg flex items-center gap-2"><Heart size={20} />Save Itinerary</button>
-                  <button className="px-8 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full font-semibold hover:shadow-lg flex items-center gap-2"><Share2 size={20} />Share Trip</button>
+                  <button onClick={() => setSaveModalOpen(true)} className="px-8 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full font-semibold hover:shadow-lg flex items-center gap-2"><Save size={20} />Save Itinerary</button>
+                  <button onClick={() => setSaveModalOpen(true)} className="px-8 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full font-semibold hover:shadow-lg flex items-center gap-2"><Share2 size={20} />Share Trip</button>
                   <button onClick={() => { setPlanningStep(1); setStartingDistrict(''); setDistrictSearch(''); setTripPreferences({ interests: [], pace: '', budget: '', groupType: '' }); setTripDuration(3); districtColorIndexRef.current = {}; districtColorCounterRef.current = 0; }} className="px-8 py-3 border-2 border-gray-300 rounded-full font-semibold hover:bg-gray-50">Plan Another</button>
                 </div>
               </div>
@@ -1288,6 +1348,137 @@ export default function AITripPlanner() {
           startIndex={lightbox.startIndex}
           onClose={() => setLightbox(null)}
         />
+      )}
+
+      {/* ── STEP 6: Save Itinerary modal ── */}
+      {saveModalOpen && (
+        <div className="fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-auto detail-modal">
+            {!savedShareUrl ? (
+              <>
+                <h3 className="text-xl font-bold mb-1 flex items-center gap-2"><Save className="text-orange-500" size={22} />Save Your Itinerary</h3>
+                <p className="text-sm text-gray-500 mb-4">Name your trip so it's easy to recognise later. You'll get a link to share.</p>
+                <input
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && saveName.trim() && !saving) handleSaveItinerary(); }}
+                  placeholder="e.g. Bastar Waterfall Adventure"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 mb-4"
+                />
+                {saveError && <p className="text-red-600 text-sm mb-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{saveError}</p>}
+                <div className="flex gap-3">
+                  <button onClick={() => { setSaveModalOpen(false); setSaveError(''); }} disabled={saving} className="flex-1 border-2 border-gray-300 rounded-xl font-semibold py-3 hover:bg-gray-50">Cancel</button>
+                  <button onClick={handleSaveItinerary} disabled={saving || !saveName.trim()} className="flex-1 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl font-semibold py-3 hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2">
+                    {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}{saving ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="text-xl font-bold mb-2 flex items-center gap-2"><Check className="text-green-600" size={22} />Trip Saved!</h3>
+                <p className="text-sm text-gray-600 mb-4">Share this link — anyone with it can view the saved itinerary.</p>
+                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 mb-4">
+                  <Link2 size={18} className="text-gray-400 flex-shrink-0" />
+                  <span className="text-sm text-gray-700 truncate flex-1">{savedShareUrl}</span>
+                  <button onClick={copyShareLink} className="flex items-center gap-1.5 bg-orange-500 text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-orange-600 transition-all flex-shrink-0">
+                    {copied ? <Check size={14} /> : <Copy size={14} />}{copied ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+                <button onClick={() => setSaveModalOpen(false)} className="w-full border-2 border-gray-300 rounded-xl font-semibold py-3 hover:bg-gray-50">Close</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── STEP 7: Shared itinerary viewer (?it=<id>) ── */}
+      {savedTripLoading && (
+        <div className="fixed inset-0 z-[95] bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 size={48} className="text-orange-500 animate-spin mx-auto mb-4" />
+            <p className="text-gray-600 font-semibold">Loading saved itinerary…</p>
+          </div>
+        </div>
+      )}
+
+      {savedTripError && !savedTripLoading && (
+        <div className="fixed inset-0 z-[95] bg-gray-50 flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-gray-200 rounded-2xl p-8 max-w-md w-full text-center">
+            <p className="text-4xl mb-4">🗺️</p>
+            <h3 className="text-xl font-bold mb-2">Itinerary Not Found</h3>
+            <p className="text-gray-600 text-sm mb-6">{savedTripError}</p>
+            <button
+              onClick={() => { setSavedTripError(''); window.location.search = ''; }}
+              className="px-8 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full font-semibold hover:shadow-lg"
+            >Return Home</button>
+          </div>
+        </div>
+      )}
+
+      {savedTrip && savedTrip.itinerary && (
+        <div className="fixed inset-0 z-[95] bg-gray-50 overflow-y-auto">
+          <div className="max-w-4xl mx-auto px-4 py-8">
+            <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-3xl font-bold gradient-text mb-1 flex items-center gap-2">{savedTrip.name || 'Shared Itinerary'}</h2>
+                <div className="flex items-center gap-2 flex-wrap mt-1">
+                  {savedTrip.starting_district && (
+                    <span className="inline-flex items-center gap-1.5 bg-orange-100 text-orange-700 text-xs font-bold px-3 py-1 rounded-full"><MapPin size={12} />Starting: {savedTrip.starting_district}</span>
+                  )}
+                  {savedTrip.days && (
+                    <span className="inline-flex items-center gap-1.5 bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-full"><Calendar size={12} />{savedTrip.days} Days</span>
+                  )}
+                  {savedTrip.itinerary.itinerary && (
+                    <span className="inline-flex items-center gap-1.5 bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full"><Navigation size={12} />{new Set(savedTrip.itinerary.itinerary.flatMap(d => d.uniqueDistricts)).size} Districts</span>
+                  )}
+                  {savedTrip.created_at && (
+                    <span className="inline-flex items-center gap-1.5 bg-gray-100 text-gray-600 text-xs font-bold px-3 py-1 rounded-full"><Clock size={12} />Saved {new Date(savedTrip.created_at).toLocaleDateString()}</span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => { setSavedTrip(null); window.location.search = ''; }}
+                className="px-6 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full font-semibold hover:shadow-lg flex items-center gap-2"
+              ><Sparkles size={18} />Plan Your Own</button>
+            </div>
+
+            {savedTrip.itinerary.estimatedCost && (
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-5 rounded-2xl mb-6">
+                <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><Wallet className="text-green-600" size={22} />Estimated Cost</h3>
+                <p className="text-3xl font-bold text-green-600 mb-1">₹{savedTrip.itinerary.estimatedCost.total.toLocaleString()}</p>
+                <p className="text-sm text-gray-600">Total for {savedTrip.days || ''} day{savedTrip.days !== 1 ? 's' : ''} · {savedTrip.group_type}</p>
+              </div>
+            )}
+
+            <div className="mb-6">
+              <h3 className="font-bold text-xl mb-4 flex items-center gap-2"><Navigation className="text-orange-500" size={22} />Day-by-Day Route</h3>
+              <div className="space-y-4">{savedTrip.itinerary.itinerary.map(day => (<DayCard key={day.day} day={day} />))}</div>
+            </div>
+
+            {savedTrip.itinerary.insights?.length > 0 && (
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 rounded-2xl mb-6">
+                <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><Sparkles className="text-blue-600" size={20} />Route Insights</h3>
+                <div className="space-y-2">{savedTrip.itinerary.insights.map((ins, i) => (<div key={i} className="flex gap-3 items-start"><Check className="text-blue-600 mt-0.5 flex-shrink-0" size={18} /><p className="text-sm text-gray-700">{ins}</p></div>))}</div>
+              </div>
+            )}
+
+            {savedTrip.itinerary.responsibleTips?.length > 0 && (
+              <div className="bg-gradient-to-r from-teal-600 to-green-700 p-5 rounded-2xl mb-6 text-white">
+                <h3 className="font-bold text-lg mb-3">🌱 Responsible Tourism Reminders</h3>
+                <div className="space-y-2">{savedTrip.itinerary.responsibleTips.map((r, i) => (<div key={i} className="flex gap-3 items-start bg-white/10 rounded-xl px-3 py-2.5"><span className="text-lg flex-shrink-0">{r.icon}</span><p className="text-sm text-teal-50">{r.tip}</p></div>))}</div>
+              </div>
+            )}
+
+            <div className="text-center pb-8">
+              {savedTrip.url && (
+                <button
+                  onClick={() => { navigator.clipboard.writeText(savedTrip.url); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                  className="inline-flex items-center gap-2 px-6 py-3 border-2 border-orange-300 text-orange-700 rounded-full font-semibold hover:bg-orange-50 transition-all"
+                >{copied ? <Check size={16} /> : <Link2 size={16} />}{copied ? 'Link Copied' : 'Copy Share Link'}</button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
     </div>
