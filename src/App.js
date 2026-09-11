@@ -615,13 +615,86 @@ export default function AITripPlanner() {
     setTimeout(() => {
       const { interests, pace, budget, groupType } = tripPreferences;
       const itinerary = generateGeoItinerary(districts, tripDuration, interests, pace, startingDistrict);
-      const baseRate = budget === 'budget' ? 3000 : budget === 'moderate' ? 6000 : 10000;
-      const mult = groupType === 'family' ? 3 : groupType === 'couple' ? 2 : groupType === 'friends' ? 4 : 1;
+
+      // ── ESTIMATED COST (data-driven) ────────────────────────────────────────
+      const groupSize = groupType === 'solo' ? 1 : groupType === 'couple' ? 2 : groupType === 'family' ? 3 : 4;
+      const dailyRates = { budget: { accommodation: 600, food: 350, transport: 100, guide: 100 }, moderate: { accommodation: 1500, food: 700, transport: 200, guide: 200 }, luxury: { accommodation: 3000, food: 1200, transport: 350, guide: 400 } };
+      const rates = dailyRates[budget] || dailyRates.moderate;
+      const allActivities = itinerary.flatMap(d => d.activities);
+      const totalEntryFees = allActivities.reduce((sum, a) => {
+        const fee = a.entryFee || '';
+        if (/free/i.test(fee)) return sum;
+        const nums = fee.match(/\d[\d,]*/g);
+        if (!nums) return sum;
+        const avg = nums.reduce((s, n) => s + parseInt(n.replace(/,/g, ''), 10), 0) / nums.length;
+        return sum + avg;
+      }, 0);
+      const totalDayKm = itinerary.reduce((sum, d) => sum + (d.totalDayKm || 0), 0);
+      const costPerKm = budget === 'budget' ? 12 : budget === 'moderate' ? 18 : 25;
+      const accommodation = Math.round(rates.accommodation * groupSize * tripDuration);
+      const food = Math.round(rates.food * groupSize * tripDuration);
+      const transport = Math.round(totalDayKm * costPerKm + rates.transport * groupSize * tripDuration);
+      const entryFees = Math.round(totalEntryFees * groupSize);
+      const activities = Math.round(rates.guide * groupSize * tripDuration);
+      const total = accommodation + food + transport + entryFees + activities;
       const estimatedCost = {
-        total: baseRate * tripDuration * mult,
-        perDay: baseRate,
-        breakdown: { accommodation: baseRate * 0.4 * tripDuration, food: baseRate * 0.3 * tripDuration, transport: baseRate * 0.2 * tripDuration, activities: baseRate * 0.1 * tripDuration }
+        total,
+        perDay: Math.round(total / tripDuration),
+        perPersonPerDay: Math.round(total / (groupSize * tripDuration)),
+        groupSize,
+        totalEntryFees: entryFees,
+        totalTransportKm: totalDayKm,
+        breakdown: { accommodation, food, transport, entryFees, activities }
       };
+
+      // ── CG VOYAGER RECOMMENDER (hybrid content-based + collaborative) ────────
+      const allPlaces = buildPlacePool(districts);
+      const itineraryNames = new Set(allActivities.map(a => a.title));
+      const visitedDistricts = new Set(itinerary.flatMap(d => d.uniqueDistricts));
+      const contentScore = (place) => {
+        let score = 0;
+        for (const interest of interests) {
+          const types = INTEREST_TYPE_MAP[interest] || [];
+          if (types.some(t => place.type?.toLowerCase().includes(t.toLowerCase()))) score += 3;
+        }
+        if (interests.some(i => ['tribal', 'ecotourism', 'localculture'].includes(i))) {
+          if (['Tribal Village', 'Tribal Market', 'Craft Workshop', 'Community Stay', 'Eco Camp', 'Nature Camp'].some(t => (place.type || '').toLowerCase().includes(t.toLowerCase()))) score += 5;
+        }
+        return score;
+      };
+      const collaborativeScore = (place) => (place.rating || 0) * 2;
+      const recScore = (place) => {
+        const cs = contentScore(place);
+        const ws = collaborativeScore(place);
+        let score = cs * 0.65 + ws * 0.35;
+        if (visitedDistricts.has(place.districtName)) score += 1;
+        const fee = (place.entryFee || '').toLowerCase();
+        if (fee === 'free' || fee.includes('free')) score += 1.5;
+        return Math.round(score * 100) / 100;
+      };
+      const scoredPlaces = allPlaces
+        .filter(p => !itineraryNames.has(p.name))
+        .map(p => ({ ...p, _score: recScore(p) }))
+        .sort((a, b) => b._score - a._score);
+      const personalizedPicks = scoredPlaces.slice(0, 6).map(p => ({
+        name: p.name,
+        district: p.districtName,
+        type: p.type,
+        score: p._score,
+        reason: p._score > 6 ? 'Strong match for your interests' : p._score > 4 ? 'Highly rated by travellers' : 'Popular nearby pick',
+        rating: p.rating,
+        entryFee: p.entryFee,
+      }));
+      const picksWithReason = personalizedPicks.map(p => {
+        const reasons = [];
+        if (interests.some(i => (INTEREST_TYPE_MAP[i] || []).some(t => p.type?.toLowerCase().includes(t.toLowerCase())))) reasons.push('matches your interests');
+        if ((p.rating || 0) >= 4.5) reasons.push('top-rated');
+        if ((p.entryFee || '').toLowerCase() === 'free') reasons.push('free entry');
+        if (visitedDistricts.has(p.district)) reasons.push(`in ${p.district}`);
+        return { ...p, reason: reasons.length ? reasons.join(' / ') : 'recommended for you' };
+      });
+
+      // ── TIPS & RECOMMENDATIONS ──────────────────────────────────────────────
       const recs = [];
       if (interests.includes('nature') || interests.includes('ecotourism')) recs.push({ title: 'Book Wildlife Safaris in Advance', reason: 'Limited daily permits available at most sanctuaries', icon: '🦁' });
       if (interests.includes('tribal') || interests.includes('localculture')) recs.push({ title: 'Always Hire Local Tribal Guides', reason: 'Cultural accuracy, community income, and access to hidden sites', icon: '🏹' });
@@ -630,6 +703,8 @@ export default function AITripPlanner() {
       if (budget === 'budget') recs.push({ title: 'Stay in Government Rest Houses', reason: 'Save 40% on accommodation costs', icon: '💰' });
       if (interests.includes('spiritual')) recs.push({ title: 'Visit Temples at Early Morning', reason: 'Peaceful darshan and avoid large crowds', icon: '🛕' });
       recs.push({ title: 'Carry Cash in Remote Areas', reason: 'ATMs are sparse in forest and tribal zones', icon: '💵' });
+
+      // ── RESPONSIBLE TRAVEL TIPS ─────────────────────────────────────────────
       const responsibleTips = [];
       if (interests.includes('tribal') || interests.includes('localculture')) {
         responsibleTips.push({ icon: '📸', tip: 'Always ask permission before photographing tribal people, rituals, or sacred spaces' });
@@ -640,6 +715,8 @@ export default function AITripPlanner() {
         responsibleTips.push({ icon: '🌿', tip: 'Zero waste in forests — every piece of rubbish must be carried back out' });
         responsibleTips.push({ icon: '🔇', tip: 'Silence is a virtue in forest zones — wildlife thrives when visitors are quiet' });
       }
+
+      // ── INSIGHTS ────────────────────────────────────────────────────────────
       const districtsCovered = new Set(itinerary.flatMap(d => d.uniqueDistricts));
       const startDist = districts.find(d => d.name === startingDistrict);
       const startPlacesDay1 = itinerary[0]?.activities.filter(a => a.districtName === startingDistrict).length || 0;
@@ -647,11 +724,13 @@ export default function AITripPlanner() {
         `Your journey starts in ${startingDistrict}${startDist ? ` — ${startDist.highlights}` : ''}. Day 1 covers ${startPlacesDay1} place${startPlacesDay1 !== 1 ? 's' : ''} right in your starting district.`,
         `The route expands outward from ${startingDistrict} each day, reaching ${districtsCovered.size} district${districtsCovered.size !== 1 ? 's' : ''} over ${tripDuration} day${tripDuration !== 1 ? 's' : ''} — minimising unnecessary backtracking.`,
         `With a ${pace} pace (${SLOTS_PER_DAY[pace]} places/day), you'll spend quality time at each stop rather than rushing between them.`,
+        `Total travel distance: ~${totalDayKm.toLocaleString()} km across ${tripDuration} day${tripDuration !== 1 ? 's' : ''}.`,
         ...(interests.includes('tribal') ? [`Tribal-interest scoring prioritises Dhokra workshops, tribal trails, and community markets in Bastar, Kondagaon, and Surguja districts.`] : []),
         ...(interests.includes('ecotourism') ? [`Eco-tourism routing favours forest lodges, nature camps, and wildlife sanctuaries with community conservation programmes.`] : []),
         `October–March is peak season for all activities in Chhattisgarh — roads are dry, wildlife is active, and temperatures are comfortable.`,
       ];
-      setTripRecommendations({ itinerary, estimatedCost, recommendations: recs, responsibleTips, insights });
+
+      setTripRecommendations({ itinerary, estimatedCost, personalizedPicks: picksWithReason, recommendations: recs, responsibleTips, insights });
       setIsAnalyzing(false);
       setPlanningStep(5);
     }, 2200);
@@ -1437,9 +1516,43 @@ export default function AITripPlanner() {
                 <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-5 rounded-2xl mb-6">
                   <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><Wallet className="text-green-600" size={22} />Estimated Cost</h3>
                   <div className="grid md:grid-cols-2 gap-4">
-                    <div><p className="text-3xl font-bold text-green-600 mb-1">₹{tripRecommendations.estimatedCost.total.toLocaleString()}</p><p className="text-sm text-gray-600">Total for {tripDuration} day{tripDuration > 1 ? 's' : ''} · {tripPreferences.groupType}</p></div>
-                    <div className="space-y-1.5">{Object.entries(tripRecommendations.estimatedCost.breakdown).map(([k, v]) => (<div key={k} className="flex justify-between text-sm"><span className="text-gray-600 capitalize">{k}</span><span className="font-semibold">₹{v.toLocaleString()}</span></div>))}</div>
+                    <div>
+                      <p className="text-3xl font-bold text-green-600 mb-1">₹{tripRecommendations.estimatedCost.total.toLocaleString()}</p>
+                      <p className="text-sm text-gray-600">Total for {tripDuration} day{tripDuration > 1 ? 's' : ''} · {tripPreferences.groupType} ({tripRecommendations.estimatedCost.groupSize} {tripRecommendations.estimatedCost.groupSize === 1 ? 'person' : 'people'})</p>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                        <span className="bg-white px-2.5 py-1 rounded-full text-green-700 font-semibold border border-green-200">₹{tripRecommendations.estimatedCost.perDay.toLocaleString()}/day total</span>
+                        <span className="bg-white px-2.5 py-1 rounded-full text-green-700 font-semibold border border-green-200">₹{tripRecommendations.estimatedCost.perPersonPerDay.toLocaleString()}/person/day</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      {Object.entries(tripRecommendations.estimatedCost.breakdown).map(([k, v]) => (<div key={k} className="flex justify-between text-sm"><span className="text-gray-600 capitalize">{k}</span><span className="font-semibold">₹{v.toLocaleString()}</span></div>))}
+                      <div className="flex justify-between text-xs text-gray-500 pt-1"><span>Travel distance</span><span className="font-semibold">~{tripRecommendations.estimatedCost.totalTransportKm.toLocaleString()} km</span></div>
+                    </div>
                   </div>
+                </div>
+                <div className="bg-gradient-to-br from-purple-50 to-fuchsia-50 p-5 rounded-2xl mb-6">
+                  <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><Sparkles className="text-purple-600" size={20} />CG Voyager Recommender · More Places You'll Love</h3>
+                  <p className="text-xs text-gray-500 mb-3">Personalised picks from {buildPlacePool(districts).length} places — scored by your interests (65%) + traveller ratings (35%).</p>
+                  {!tripRecommendations.personalizedPicks || tripRecommendations.personalizedPicks.length === 0 ? (
+                    <p className="text-sm text-gray-500">No additional recommendations found.</p>
+                  ) : (
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {tripRecommendations.personalizedPicks.map(p => (
+                        <div key={p.name} className="bg-white p-3 rounded-xl border border-purple-100">
+                          <div className="flex justify-between items-start gap-2">
+                            <p className="text-sm font-bold text-purple-900">{p.name}</p>
+                            <span className="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full flex-shrink-0">{p.score}</span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-0.5">{p.district} · {p.type}</p>
+                          <p className="text-xs text-purple-700 mt-1.5 italic">{p.reason}</p>
+                          <div className="flex items-center justify-between text-xs mt-2 text-gray-600">
+                            <span>★ {p.rating}</span>
+                            <span>{p.entryFee || 'Free'}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="mb-6">
                   <h3 className="font-bold text-xl mb-1 flex items-center gap-2"><Navigation className="text-orange-500" size={22} />Day-by-Day Route</h3>
@@ -1645,8 +1758,24 @@ export default function AITripPlanner() {
             {savedTrip.itinerary.estimatedCost && (
               <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-5 rounded-2xl mb-6">
                 <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><Wallet className="text-green-600" size={22} />Estimated Cost</h3>
-                <p className="text-3xl font-bold text-green-600 mb-1">₹{savedTrip.itinerary.estimatedCost.total.toLocaleString()}</p>
-                <p className="text-sm text-gray-600">Total for {savedTrip.days || ''} day{savedTrip.days !== 1 ? 's' : ''} · {savedTrip.group_type}</p>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-3xl font-bold text-green-600 mb-1">₹{savedTrip.itinerary.estimatedCost.total.toLocaleString()}</p>
+                    <p className="text-sm text-gray-600">Total for {savedTrip.days || ''} day{savedTrip.days !== 1 ? 's' : ''} · {savedTrip.group_type}{savedTrip.itinerary.estimatedCost.groupSize ? ` (${savedTrip.itinerary.estimatedCost.groupSize} ${savedTrip.itinerary.estimatedCost.groupSize === 1 ? 'person' : 'people'})` : ''}</p>
+                    {savedTrip.itinerary.estimatedCost.perDay && (
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                        <span className="bg-white px-2.5 py-1 rounded-full text-green-700 font-semibold border border-green-200">₹{savedTrip.itinerary.estimatedCost.perDay.toLocaleString()}/day total</span>
+                        {savedTrip.itinerary.estimatedCost.perPersonPerDay && <span className="bg-white px-2.5 py-1 rounded-full text-green-700 font-semibold border border-green-200">₹{savedTrip.itinerary.estimatedCost.perPersonPerDay.toLocaleString()}/person/day</span>}
+                      </div>
+                    )}
+                  </div>
+                  {savedTrip.itinerary.estimatedCost.breakdown && (
+                    <div className="space-y-1.5">
+                      {Object.entries(savedTrip.itinerary.estimatedCost.breakdown).map(([k, v]) => (<div key={k} className="flex justify-between text-sm"><span className="text-gray-600 capitalize">{k}</span><span className="font-semibold">₹{Number(v).toLocaleString()}</span></div>))}
+                      {savedTrip.itinerary.estimatedCost.totalTransportKm != null && <div className="flex justify-between text-xs text-gray-500 pt-1"><span>Travel distance</span><span className="font-semibold">~{Number(savedTrip.itinerary.estimatedCost.totalTransportKm).toLocaleString()} km</span></div>}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
