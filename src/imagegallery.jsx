@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, X, ZoomIn, Grid, Play } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, ZoomIn, Grid, Play, ImageOff } from 'lucide-react';
 
 // ─── THUMBNAIL STRIP CAROUSEL (used inside place cards in the district modal) ─
 export function PlaceImageCarousel({ images, placeName, onOpenLightbox, primaryImage }) {
@@ -20,6 +20,19 @@ export function PlaceImageCarousel({ images, placeName, onOpenLightbox, primaryI
   const imgSrc = (idx) => errors[idx]
     ? 'https://portal-tourism.cgstate.gov.in/files/gangrel-bandh-image.webp'
     : allImgs[idx];
+
+  if (total === 0) {
+    return (
+      <div className="relative h-44 overflow-hidden bg-gray-100 group">
+        <div className="w-full h-full flex items-center justify-center">
+          <div className="text-center text-gray-400">
+            <ImageOff size={32} className="mx-auto mb-2" />
+            <p className="text-xs font-medium">Photo unavailable</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-44 overflow-hidden bg-gray-100 group">
@@ -88,11 +101,21 @@ export function PlaceImageCarousel({ images, placeName, onOpenLightbox, primaryI
 // ─── GRID GALLERY (used inside detail modal — shows 4–5 images as a grid) ────
 export function PlaceImageGrid({ images, placeName, onOpenLightbox }) {
   const [errors, setErrors] = useState({});
-  const fallback = 'https://portal-tourism.cgstate.gov.in/files/gangrel-bandh-image.webp';
 
-  const imgs = (images && images.length > 0 ? images : [fallback]).slice(0, 5);
+  const imgs = (images || []).slice(0, 5);
   const handleError = idx => setErrors(e => ({ ...e, [idx]: true }));
-  const src = idx => errors[idx] ? fallback : imgs[idx];
+  const src = idx => imgs[idx];
+
+  if (imgs.length === 0) {
+    return (
+      <div className="h-72 rounded-2xl bg-gray-100 flex items-center justify-center">
+        <div className="text-center text-gray-400">
+          <ImageOff size={32} className="mx-auto mb-2" />
+          <p className="text-sm font-medium">No photos available for this place</p>
+        </div>
+      </div>
+    );
+  }
 
   if (imgs.length === 1) {
     return (

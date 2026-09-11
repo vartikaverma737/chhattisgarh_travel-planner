@@ -13,111 +13,57 @@ const FALLBACK = `${CTB}gangrel-bandh-image.webp`;
 
 export const PLACE_IMAGES = {
 
-  // ══════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════
   // RAIPUR
   // ══════════════════════════════════════════════════════════════════════
   'Mahant Ghasidas Memorial Museum': [
     `${WMF}5/51/Mahant_Ghasidas_Sangrahalaya_Raipur_%281%29.jpg`,
-    `${WMF}5/51/Mahant_Ghasidas_Sangrahalaya_Raipur_%281%29.jpg`,
-    `${CTB}3%20(2).jpg`,
-    `${CTB}001%20(2).jpg`,
   ],
   'Nandan Van Zoo & Safari': [
     `${WMF}b/b4/Nandan_Van_Zoo_and_Safari_Naya_Raipur.png`,
-    `${CTB}4.jpg`,
-    `${CTB}001%20(2).jpg`,
   ],
   'Vivekananda Sarovar': [
     `${WMF}1/19/Vivekananda_Raipur1.JPG`,
-    `${CTB}3%20(2).jpg`,
-    `${CTB}4.jpg`,
   ],
   'Purkhouti Muktangan': [
     `${WMF}a/af/Purkhauti_Muktangan%2C_Sector_24_Naya_Raipur.png`,
-    `${CTB}3%20(2).jpg`,
-    `${CTB}001%20(2).jpg`,
   ],
-  'Champaran Dham': [
-    `${CTB}001%20(2).jpg`,
-    `${CTB}3%20(2).jpg`,
-    `${CTB}4.jpg`,
-    `${CTB}gangrel-bandh-image.webp`,
-  ],
-'Dudhadhari Math': [
+  'Dudhadhari Math': [
     `${WMF}9/9f/Dudhadhari_mandir.JPG`,
-    `${CTB}001%20(2).jpg`,
-    `${CTB}4.jpg`,
-  ],
-  'Rajiv Gandhi Smriti Van': [
-    `${CTB}3%20(2).jpg`,
-    `${CTB}001%20(2).jpg`,
-    `${CTB}4.jpg`,
-    `${CTB}gangrel-bandh-image.webp`,
-  ],
-  'MM Fun City': [
-    `${CTB}001%20(2).jpg`,
-    `${CTB}4.jpg`,
-    `${CTB}3%20(2).jpg`,
-    `${CTB}gangrel-bandh-image.webp`,
-  ],
-  'Science Centre Raipur': [
-    `${CTB}3%20(2).jpg`,
-    `${CTB}001%20(2).jpg`,
-    `${CTB}4.jpg`,
-    `${CTB}gangrel-bandh-image.webp`,
-  ],
-  'Telibandha Lake': [
-    `${CTB}3%20(2).jpg`,
-    `${CTB}gangrel-bandh-image.webp`,
-    `${CTB}001%20(2).jpg`,
-    `${CTB}4.jpg`,
   ],
   'Ram Mandir VIP Road': [
     `${WMF}1/19/Sri_Ram_Mandir_raipur_.jpg`,
     `${WMF}8/85/Sri_Ram_Mandir%2C_Raipur_.jpg`,
-    `${CTB}001%20(2).jpg`,
   ],
   'ISKCON Temple Raipur': [
     `${WMF}f/f5/Iskcon_mandir%2C_raipur.JPG`,
     `${WMF}5/5d/Iskcon_mandir%2C_tati_bandh_raipur.JPG`,
-    `${CTB}001%20(2).jpg`,
   ],
   'Maha Maya Temple Raipur': [
     `${WMF}d/d1/Shree_Rajrajeshwari_Maa_Mahamaya_Devi_Mandir.JPG`,
-    `${CTB}001%20(2).jpg`,
   ],
   'Naya Raipur Musical Fountain': [
     `${WMF}6/6e/Musical_Fountain%2C_sector_19_Naya_Raipur.png`,
     `${WMF}8/8d/Musical_fountain%2C_In_sector_19_Atal_Nagar_%2C_Naya_Raipur.png`,
-    `${CTB}3%20(2).jpg`,
   ],
   'Arang Temple Town': [
     `${WMF}3/3c/9th_century_reliefs_on_exterior_wall_of_Bhand_Deul_Jain_brick_temple%2C_Arang_Chhattisgarh_2.jpg`,
     `${WMF}5/56/9th_century_reliefs_on_exterior_wall_of_Bhand_Deul_Jain_brick_temple%2C_Arang_Chhattisgarh_4.jpg`,
-    `${CTB}001%20(2).jpg`,
   ],
   'Bhand Dewal Jain Temple (Arang)': [
     `${WMF}7/7f/9th_century_Bhand_Deul_Jain_brick_temple%2C_Arang_Chhattisgarh.jpg`,
     `${WMF}3/3c/Three_sculptures_of_Jain_tirthankaras_in_the_Bhand_Dewal_Temple%2C_Arang.jpg`,
     `${WMF}3/34/Ruins_of_the_great_Jain_temple%2C_Bhand_Dewal%2C_at_Arang.jpg`,
-    `${CTB}001%20(2).jpg`,
-  ],
-  'Bagh Deval Temple (Arang)': [
-    `${WMF}6/6a/9th_century_reliefs_on_exterior_wall_of_Bhand_Deul_Jain_brick_temple%2C_Arang_Chhattisgarh_5.jpg`,
-    `${WMF}5/56/9th_century_reliefs_on_exterior_wall_of_Bhand_Deul_Jain_brick_temple%2C_Arang_Chhattisgarh_4.jpg`,
-    `${CTB}001%20(2).jpg`,
   ],
   'Chitawari Devi Temple (Dhobni)': [
     `${WMF}6/69/Dhobni_Damakheda_Chitawari_Devi_temple_Chhattisgarh_Oct_2022_-_3.jpg`,
     `${WMF}a/a1/Dhobni_Damakheda_Chitawari_Devi_temple_Chhattisgarh_Oct_2022_-_6.jpg`,
     `${WMF}1/1b/Dhobni_Damakheda_Chitawari_Devi_temple_Chhattisgarh_Oct_2022_-_58.jpg`,
-    `${CTB}001%20(2).jpg`,
   ],
   'Dhoomnath Temple (Saragaon)': [
     `${WMF}6/6f/Sargaon_Dhoomnath_Dhumeswari_temple_Chhattisgarh_-_1.jpg`,
     `${WMF}b/ba/Sargaon_Dhoomnath_Dhumeswari_temple_Chhattisgarh_-_8.jpg`,
     `${WMF}3/3b/Sargaon_Dhoomnath_Dhumeswari_temple_Chhattisgarh_-_70.jpg`,
-    `${CTB}001%20(2).jpg`,
   ],
   'Kaivalya Dham Jain Temple': [
     `${WMF}3/36/Kaivalydham_Jain_temple%2C_raipur.JPG`,
@@ -127,7 +73,6 @@ export const PLACE_IMAGES = {
   ],
   'Jagannath Temple Raipur': [
     `${WMF}a/af/Raipur_Chattisgarh.jpg`,
-    `${CTB}001%20(2).jpg`,
   ],
   'Kaushalya Mata Temple Chandkhuri': [
     `${WMF}3/30/Mata_kaushalya_devi_temple.jpg`,
@@ -141,23 +86,13 @@ export const PLACE_IMAGES = {
   ],
   'Mahant Ghasidas Museum Gardens': [
     `${WMF}5/51/Mahant_Ghasidas_Sangrahalaya_Raipur_%281%29.jpg`,
-    `${CTB}001%20(2).jpg`,
   ],
-  'Navagaon Ancient Brick Temple': [
-    `${CTB}001%20(2).jpg`,
-    `${CTB}3%20(2).jpg`,
+  'Naya Raipur Central Park': [
+    `${WMF}1/13/Central_Park%2C_Sector_24_Naya_Raipur.png`,
   ],
-  'Radha Krishna Temple (Samta Colony)': [
-    `${CTB}001%20(2).jpg`,
-  ],
-  'Hanuman Mandir (Tatyapara, GE Road)': [
-    `${CTB}001%20(2).jpg`,
-  ],
-  'Budhapara Lake': [
-    `${CTB}001%20(2).jpg`,
-  ],
-  'Maa Mahankali Mandir (Civil Lines)': [
-    `${CTB}001%20(2).jpg`,
+  'Shaheed Veer Narayan Singh International Stadium': [
+    `${WM}4/4a/Shaheed_Veer_Narayan_Singh_International_Stadium_Raipur.jpg/960px-Shaheed_Veer_Narayan_Singh_International_Stadium_Raipur.jpg`,
+    `${WMF}5/5e/Shaheed_Veer_Narayan_International_Cricket_Stadium_Raipur%2C_drone_view.png`,
   ],
 
   // ══════════════════════════════════════════════════════════════════════
@@ -728,24 +663,9 @@ export const PLACE_IMAGES = {
     `${CTB}Ruined_temple_near_Rani_Talab,_Dipadih_Kusmi_Dipadih_Chattisgarh_036.jpg`,
     `${CTB}gangrel-bandh-image.webp`,
   ],
-  'Chhatauni Waterfall': [
+'Chhatauni Waterfall': [
     `${CTB}Chitrakote%20Waterfall%20(7).jpg`,
     `${CTB}Ruined_temple_near_Rani_Talab,_Dipadih_Kusmi_Dipadih_Chattisgarh_036.jpg`,
-    `${CTB}gangrel-bandh-image.webp`,
-  ],
-  'Naya Raipur Central Park': [
-    `${WMF}1/13/Central_Park%2C_Sector_24_Naya_Raipur.png`,
-    `${CTB}001%20(2).jpg`,
-    `${CTB}3%20(2).jpg`,
-    `${CTB}4.jpg`,
-    `${CTB}gangrel-bandh-image.webp`,
-  ],
-  'Shaheed Veer Narayan Singh International Stadium': [
-    `${WM}4/4a/Shaheed_Veer_Narayan_Singh_International_Stadium_Raipur.jpg/960px-Shaheed_Veer_Narayan_Singh_International_Stadium_Raipur.jpg`,
-    `${WMF}5/5e/Shaheed_Veer_Narayan_International_Cricket_Stadium_Raipur%2C_drone_view.png`,
-    `${CTB}001%20(2).jpg`,
-    `${CTB}3%20(2).jpg`,
-    `${CTB}4.jpg`,
     `${CTB}gangrel-bandh-image.webp`,
   ],
 };
@@ -791,6 +711,9 @@ const DISTRICT_FB = {
 export function getPlaceImages(placeName, districtName, primaryImage) {
   const mapped = PLACE_IMAGES[placeName];
   if (mapped && mapped.length > 0) return mapped;
+
+  // No image assigned for this place — don't show any placeholder photo
+  if (!primaryImage) return [];
 
   // Build a 4-image fallback set using district image + generic fallback
   const distFb = DISTRICT_FB[districtName] || FALLBACK;
