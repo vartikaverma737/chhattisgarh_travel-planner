@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Calendar, Sun, Cloud, Menu, X, Search, Heart, Share2, Mountain, Camera, TreePine, Map, Navigation, Clock, Info, Users, Wallet, Sparkles, TrendingUp, ArrowRight, Check, Filter, Star, Phone, Globe, Save, Link2, Copy, Loader2, Bookmark } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Calendar, Sun, Cloud, Menu, X, Search, Heart, Share2, Mountain, Camera, TreePine, Map, Navigation, Clock, Info, Users, Wallet, Sparkles, TrendingUp, ArrowRight, Check, Filter, Star, Phone, Globe, Save, Link2, Copy, Loader2, Bookmark, ExternalLink } from 'lucide-react';
 
 // ── STEP 1: Gallery imports ───────────────────────────────────────────────────
 import { PLACE_IMAGES, getPlaceImages } from './placeimage';
 import { PlaceImageCarousel, PlaceImageGrid, ImageLightbox } from './imagegallery';
+import GoogleMapView from './GoogleMapView';
 import { saveItinerary, fetchItinerary, listItineraries, deleteItinerary, isSupabaseConfigured } from './supabaseClient';
 
 const CTB = 'https://portal-tourism.cgstate.gov.in/files/';
@@ -1224,6 +1225,22 @@ export default function AITripPlanner() {
               </div>
             </div>
             <div className="p-6 md:p-8">
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-bold text-lg text-gray-800">📍 District Map</h3>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(viewingDistrictPlaces.name + ', Chhattisgarh, India')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline"
+                  >Open in Google Maps <ExternalLink size={11} /></a>
+                </div>
+                <GoogleMapView
+                  places={[{ name: viewingDistrictPlaces.name, district: viewingDistrictPlaces.name, lat: viewingDistrictPlaces.coordinates.lat, lng: viewingDistrictPlaces.coordinates.lng, info: `${viewingDistrictPlaces.touristPlaces.length} tourist places` }]}
+                  height="260px"
+                  zoom={11}
+                />
+              </div>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
                 {viewingDistrictPlaces.touristPlaces.map((place, idx) => {
                   const placeImgs = getPlaceImages(place.name, viewingDistrictPlaces.name, place.image);
@@ -1253,7 +1270,7 @@ export default function AITripPlanner() {
                           <span className="text-xs font-semibold text-gray-600">{place.rating}</span>
                         </div>
                         <button
-                          onClick={() => setSelectedPlaceDetail({ ...place, _images: placeImgs })}
+                          onClick={() => setSelectedPlaceDetail({ ...place, _images: placeImgs, _district: viewingDistrictPlaces.name, _coords: viewingDistrictPlaces.coordinates })}
                           className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 text-orange-600 hover:from-orange-500 hover:to-red-600 hover:text-white hover:border-transparent px-4 py-2.5 rounded-lg font-semibold text-sm transition-all">
                           <Info size={16} />View Details
                         </button>
@@ -1309,6 +1326,24 @@ export default function AITripPlanner() {
                 <div className="bg-purple-50 p-3 rounded-xl"><div className="text-xs font-bold text-purple-700 mb-1">⭐ Rating</div><div className="flex items-center gap-1">{getRatingStars(selectedPlaceDetail.rating)}<span className="text-sm ml-1">{selectedPlaceDetail.rating}</span></div></div>
               </div>
               {selectedPlaceDetail.tips && <div className="bg-amber-50 p-4 rounded-xl mb-4"><p className="text-xs font-bold text-amber-700 mb-1">💡 Traveler Tips</p><p className="text-sm text-gray-600">{selectedPlaceDetail.tips}</p></div>}
+              {selectedPlaceDetail._coords && (
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">📍 Location · {selectedPlaceDetail._district}</p>
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedPlaceDetail.name + ', ' + selectedPlaceDetail._district + ', Chhattisgarh, India')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline"
+                    >Open in Google Maps <ExternalLink size={11} /></a>
+                  </div>
+                  <GoogleMapView
+                    places={[{ name: selectedPlaceDetail.name, district: selectedPlaceDetail._district, lat: selectedPlaceDetail._coords.lat, lng: selectedPlaceDetail._coords.lng }]}
+                    height="200px"
+                    zoom={11}
+                  />
+                </div>
+              )}
               <div className="flex gap-3">
                 <button onClick={() => { setSelectedPlaceDetail(null); setShowTripPlanner(true); }} className="flex-1 bg-gradient-to-r from-orange-500 to-red-600 text-white px-5 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 text-sm"><Sparkles size={16} />Plan Trip Here</button>
                 <button onClick={() => setSelectedPlaceDetail(null)} className="flex-1 border-2 border-gray-200 text-gray-700 px-5 py-3 rounded-xl font-semibold text-sm">Close</button>
@@ -1553,6 +1588,19 @@ export default function AITripPlanner() {
                       ))}
                     </div>
                   )}
+                </div>
+                <div className="mb-6">
+                  <h3 className="font-bold text-xl mb-1 flex items-center gap-2"><Map className="text-red-500" size={22} />Trip Route Map</h3>
+                  <p className="text-sm text-gray-500 mb-3">Your {tripDuration}-day journey across {new Set(tripRecommendations.itinerary.flatMap(d => d.uniqueDistricts)).size} districts — click markers for place details.</p>
+                  <GoogleMapView
+                    places={tripRecommendations.itinerary.flatMap(day => day.activities.map(a => {
+                      const dist = districts.find(d => d.name === a.districtName);
+                      return { name: a.title, district: a.districtName, lat: dist?.coordinates?.lat, lng: dist?.coordinates?.lng, info: `Day ${day.day}` };
+                    })).filter(p => typeof p.lat === 'number' && typeof p.lng === 'number')}
+                    polyline
+                    height="320px"
+                    zoom={8}
+                  />
                 </div>
                 <div className="mb-6">
                   <h3 className="font-bold text-xl mb-1 flex items-center gap-2"><Navigation className="text-orange-500" size={22} />Day-by-Day Route</h3>
