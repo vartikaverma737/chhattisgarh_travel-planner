@@ -23,18 +23,19 @@ export const PLACE_IMAGES = {
     `${CTB}001%20(2).jpg`,
   ],
   'Nandan Van Zoo & Safari': [
+    `${WMF}b/b4/Nandan_Van_Zoo_and_Safari_Naya_Raipur.png`,
     `${CTB}4.jpg`,
     `${CTB}001%20(2).jpg`,
-    `${CTB}3%20(2).jpg`,
   ],
   'Vivekananda Sarovar': [
+    `${WMF}1/19/Vivekananda_Raipur1.JPG`,
     `${CTB}3%20(2).jpg`,
     `${CTB}4.jpg`,
   ],
   'Purkhouti Muktangan': [
+    `${WMF}a/af/Purkhauti_Muktangan%2C_Sector_24_Naya_Raipur.png`,
     `${CTB}3%20(2).jpg`,
     `${CTB}001%20(2).jpg`,
-    `${CTB}4.jpg`,
   ],
   'Champaran Dham': [
     `${CTB}001%20(2).jpg`,
@@ -42,7 +43,8 @@ export const PLACE_IMAGES = {
     `${CTB}4.jpg`,
     `${CTB}gangrel-bandh-image.webp`,
   ],
-  'Dudhadhari Math': [
+'Dudhadhari Math': [
+    `${WMF}9/9f/Dudhadhari_mandir.JPG`,
     `${CTB}001%20(2).jpg`,
     `${CTB}4.jpg`,
   ],
@@ -69,6 +71,93 @@ export const PLACE_IMAGES = {
     `${CTB}gangrel-bandh-image.webp`,
     `${CTB}001%20(2).jpg`,
     `${CTB}4.jpg`,
+  ],
+  'Ram Mandir VIP Road': [
+    `${WMF}1/19/Sri_Ram_Mandir_raipur_.jpg`,
+    `${WMF}8/85/Sri_Ram_Mandir%2C_Raipur_.jpg`,
+    `${CTB}001%20(2).jpg`,
+  ],
+  'ISKCON Temple Raipur': [
+    `${WMF}f/f5/Iskcon_mandir%2C_raipur.JPG`,
+    `${WMF}5/5d/Iskcon_mandir%2C_tati_bandh_raipur.JPG`,
+    `${CTB}001%20(2).jpg`,
+  ],
+  'Maha Maya Temple Raipur': [
+    `${WMF}d/d1/Shree_Rajrajeshwari_Maa_Mahamaya_Devi_Mandir.JPG`,
+    `${CTB}001%20(2).jpg`,
+  ],
+  'Naya Raipur Musical Fountain': [
+    `${WMF}6/6e/Musical_Fountain%2C_sector_19_Naya_Raipur.png`,
+    `${WMF}8/8d/Musical_fountain%2C_In_sector_19_Atal_Nagar_%2C_Naya_Raipur.png`,
+    `${CTB}3%20(2).jpg`,
+  ],
+  'Arang Temple Town': [
+    `${WMF}3/3c/9th_century_reliefs_on_exterior_wall_of_Bhand_Deul_Jain_brick_temple%2C_Arang_Chhattisgarh_2.jpg`,
+    `${WMF}5/56/9th_century_reliefs_on_exterior_wall_of_Bhand_Deul_Jain_brick_temple%2C_Arang_Chhattisgarh_4.jpg`,
+    `${CTB}001%20(2).jpg`,
+  ],
+  'Bhand Dewal Jain Temple (Arang)': [
+    `${WMF}7/7f/9th_century_Bhand_Deul_Jain_brick_temple%2C_Arang_Chhattisgarh.jpg`,
+    `${WMF}3/3c/Three_sculptures_of_Jain_tirthankaras_in_the_Bhand_Dewal_Temple%2C_Arang.jpg`,
+    `${WMF}3/34/Ruins_of_the_great_Jain_temple%2C_Bhand_Dewal%2C_at_Arang.jpg`,
+    `${CTB}001%20(2).jpg`,
+  ],
+  'Bagh Deval Temple (Arang)': [
+    `${WMF}6/6a/9th_century_reliefs_on_exterior_wall_of_Bhand_Deul_Jain_brick_temple%2C_Arang_Chhattisgarh_5.jpg`,
+    `${WMF}5/56/9th_century_reliefs_on_exterior_wall_of_Bhand_Deul_Jain_brick_temple%2C_Arang_Chhattisgarh_4.jpg`,
+    `${CTB}001%20(2).jpg`,
+  ],
+  'Chitawari Devi Temple (Dhobni)': [
+    `${WMF}6/69/Dhobni_Damakheda_Chitawari_Devi_temple_Chhattisgarh_Oct_2022_-_3.jpg`,
+    `${WMF}a/a1/Dhobni_Damakheda_Chitawari_Devi_temple_Chhattisgarh_Oct_2022_-_6.jpg`,
+    `${WMF}1/1b/Dhobni_Damakheda_Chitawari_Devi_temple_Chhattisgarh_Oct_2022_-_58.jpg`,
+    `${CTB}001%20(2).jpg`,
+  ],
+  'Dhoomnath Temple (Saragaon)': [
+    `${WMF}6/6f/Sargaon_Dhoomnath_Dhumeswari_temple_Chhattisgarh_-_1.jpg`,
+    `${WMF}b/ba/Sargaon_Dhoomnath_Dhumeswari_temple_Chhattisgarh_-_8.jpg`,
+    `${WMF}3/3b/Sargaon_Dhoomnath_Dhumeswari_temple_Chhattisgarh_-_70.jpg`,
+    `${CTB}001%20(2).jpg`,
+  ],
+  'Kaivalya Dham Jain Temple': [
+    `${WMF}3/36/Kaivalydham_Jain_temple%2C_raipur.JPG`,
+    `${WMF}b/b2/Kaivalydham_Jain_temple%2C.JPG`,
+    `${WMF}e/e4/Kaivalydham_Jain_temple%2C_Raipur.JPG`,
+    `${WMF}4/41/Kaivalydham_Jain_temple2_%2C_Raipur.JPG`,
+  ],
+  'Jagannath Temple Raipur': [
+    `${WMF}a/af/Raipur_Chattisgarh.jpg`,
+    `${CTB}001%20(2).jpg`,
+  ],
+  'Kaushalya Mata Temple Chandkhuri': [
+    `${WMF}3/30/Mata_kaushalya_devi_temple.jpg`,
+    `${WMF}0/02/Chandkhuri_Shiv_temple.jpg`,
+    `${WMF}d/d3/Entry_mata_kaushalya_devi_temple.jpg`,
+  ],
+  'Shadani Darbar (Tatibandh)': [
+    `${WMF}1/19/Shahdani_Darbar_1.jpg`,
+    `${WMF}f/fc/Shadani_Unique_Temple_of_Temples.jpg`,
+    `${WMF}9/96/Shahdani_Darbar_2.jpg`,
+  ],
+  'Mahant Ghasidas Museum Gardens': [
+    `${WMF}5/51/Mahant_Ghasidas_Sangrahalaya_Raipur_%281%29.jpg`,
+    `${CTB}001%20(2).jpg`,
+  ],
+  'Navagaon Ancient Brick Temple': [
+    `${CTB}001%20(2).jpg`,
+    `${CTB}3%20(2).jpg`,
+  ],
+  'Radha Krishna Temple (Samta Colony)': [
+    `${CTB}001%20(2).jpg`,
+  ],
+  'Hanuman Mandir (Tatyapara, GE Road)': [
+    `${CTB}001%20(2).jpg`,
+  ],
+  'Budhapara Lake': [
+    `${CTB}001%20(2).jpg`,
+  ],
+  'Maa Mahankali Mandir (Civil Lines)': [
+    `${CTB}001%20(2).jpg`,
   ],
 
   // ══════════════════════════════════════════════════════════════════════
