@@ -1,7 +1,7 @@
-// Google Maps configuration
-// TODO: Replace with your real Google Maps JavaScript API key.
-// Get one at https://console.cloud.google.com/google/maps-apis
-export const GOOGLE_MAPS_API_KEY = '';
+// Google Maps configuration.
+// Set REACT_APP_GOOGLE_MAPS_API_KEY in your environment instead of hardcoding
+// a key in source. Get one at https://console.cloud.google.com/google/maps-apis
+export const GOOGLE_MAPS_API_KEY = (process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '').trim();
 
 export const MAPS_LOADING = 'loading';
 export const MAPS_LOADED = 'loaded';

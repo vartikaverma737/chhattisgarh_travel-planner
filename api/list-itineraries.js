@@ -1,3 +1,5 @@
+import { sanitizeLimit, PUBLIC_ITINERARY_COLUMNS } from './lib/itineraryValidation.js';
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -9,7 +11,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Supabase not configured' });
   }
 
-  const limit = Math.min(parseInt(req.query.limit || '50', 10), 100);
+  const limit = sanitizeLimit(req.query.limit);
 
   try {
     const r = await fetch(
@@ -20,9 +22,20 @@ export default async function handler(req, res) {
     );
 
     const text = await r.text().catch(() => '');
-    res.status(r.status).setHeader('Content-Type', 'application/json');
-    return res.send(text || '[]');
+    let parsed;
+    try {
+      parsed = text ? JSON.parse(text) : null;
+    } catch (err) {
+      parsed = null;
+    }
+
+    if (!r.ok || parsed === null) {
+      return res.status(502).json({ error: 'Database operation failed' });
+    }
+
+    res.status(200).setHeader('Content-Type', 'application/json');
+    return res.json(parsed);
   } catch (err) {
-    return res.status(502).json({ error: `Upstream error: ${err.message}` });
+    return res.status(502).json({ error: 'Upstream error' });
   }
 }

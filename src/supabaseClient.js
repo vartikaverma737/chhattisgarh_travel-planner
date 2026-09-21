@@ -1,9 +1,9 @@
 export const isSupabaseConfigured = Boolean(process.env.REACT_APP_SUPABASE_URL || '');
 
-async function postgrest(method, path, body) {
+async function postgrest(method, path, body, extraHeaders) {
   const res = await fetch(`/api/${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(extraHeaders || {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
 
@@ -35,6 +35,11 @@ export async function listItineraries(limit = 50) {
   return postgrest('GET', `list-itineraries?limit=${limit}`, null);
 }
 
-export async function deleteItinerary(id) {
-  return postgrest('DELETE', `delete-itinerary?id=${encodeURIComponent(id)}`, null);
+export async function deleteItinerary(id, deleteToken) {
+  return postgrest(
+    'DELETE',
+    `delete-itinerary?id=${encodeURIComponent(id)}`,
+    null,
+    deleteToken ? { 'x-delete-token': deleteToken } : undefined
+  );
 }

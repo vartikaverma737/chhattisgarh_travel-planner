@@ -1,13 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { getMapsStatus, loadGoogleMaps, MAPS_LOADED, MAPS_MISSING_KEY, MAPS_ERROR } from './googleMapsConfig';
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (ch) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+  ));
+}
+
 function PlaceholderMap({ title }) {
   return (
     <div className="w-full h-full min-h-[240px] rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
       <div className="text-center px-6">
         <div className="text-4xl mb-2">🗺️</div>
         <p className="font-bold text-gray-700 mb-1">{title || 'Interactive Map'}</p>
-        <p className="text-xs text-gray-500">Add a Google Maps API key in <code className="text-orange-600 font-mono">src/googleMapsConfig.js</code> to enable live map markers.</p>
+        <p className="text-xs text-gray-500">Set <code className="text-orange-600 font-mono">REACT_APP_GOOGLE_MAPS_API_KEY</code> in your <code className="text-orange-600 font-mono">.env</code> file to enable live map markers.</p>
       </div>
     </div>
   );
@@ -56,9 +62,9 @@ export default function GoogleMapView({ places = [], polyline = false, height = 
         title: p.name,
       });
       const infoContent = `<div style="min-width:140px;font-family:system-ui,sans-serif">
-        <strong style="color:#ea580c">${p.name}</strong><br/>
-        <span style="font-size:12px;color:#555">${p.district || ''}</span>
-        ${p.info ? `<br/><span style="font-size:12px;color:#333">${p.info}</span>` : ''}
+        <strong style="color:#ea580c">${escapeHtml(p.name)}</strong><br/>
+        <span style="font-size:12px;color:#555">${escapeHtml(p.district || '')}</span>
+        ${p.info ? `<br/><span style="font-size:12px;color:#333">${escapeHtml(p.info)}</span>` : ''}
       </div>`;
       marker.addListener('click', () => {
         if (infoWindowRef.current) infoWindowRef.current.close();

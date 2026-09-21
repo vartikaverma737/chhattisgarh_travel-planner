@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Calendar, Sun, Cloud, Menu, X, Search, Heart, Share2, Mountain, Camera, TreePine, Map, Navigation, Clock, Info, Users, Wallet, Sparkles, TrendingUp, ArrowRight, Check, Filter, Star, Phone, Globe, Save, Link2, Copy, Loader2, Bookmark, ExternalLink } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, MapPin, Calendar, Sun, Cloud, Menu, X, Search, Heart, Share2, Mountain, Camera, TreePine, Map, Navigation, Clock, Info, Users, Wallet, Sparkles, TrendingUp, ArrowRight, Check, Filter, Star, Phone, Globe, Save, Link2, Copy, Loader2, Bookmark, ExternalLink } from 'lucide-react';
 
 // ── STEP 1: Gallery imports ───────────────────────────────────────────────────
 import { PLACE_IMAGES, getPlaceImages } from './placeimage';
 import { PlaceImageCarousel, PlaceImageGrid, ImageLightbox } from './imagegallery';
 import GoogleMapView from './GoogleMapView';
 import { saveItinerary, fetchItinerary, listItineraries, deleteItinerary, isSupabaseConfigured } from './supabaseClient';
+import { useLanguage, LANGUAGES } from './i18n';
+import { localizeDistrict } from './districtData';
+import { localizePlaceName } from './placeNamesData';
+import { localizePlace } from './placeData';
 
 const CTB = 'https://portal-tourism.cgstate.gov.in/files/';
 const WM = 'https://upload.wikimedia.org/wikipedia/commons/thumb/';
@@ -113,6 +117,8 @@ function mapActivityType(placeType) {
   return 'culture';
 }
 
+const TYPE_LABEL_KEY = { nature: 'cat.nature', spiritual: 'cat.spiritual', heritage: 'cat.heritage', urban: 'cat.urban', tribal: 'cat.tribal', eco: 'cat.eco', culture: 'cat.culture', adventure: 'cat.adventure' };
+
 function buildPlacePool(districts) {
   return districts.flatMap(district =>
     district.touristPlaces.map(place => ({ ...place, districtName: district.name, coords: district.coordinates }))
@@ -167,7 +173,7 @@ function generateGeoItinerary(districts, days, interests, pace, startingDistrict
       const nextPlace = dayPlaces[i + 1];
       const distToNextKm = nextPlace ? Math.round(haversineDistance(place.coords, nextPlace.coords)) : null;
       const driveToNext = distToNextKm ? driveTimeLabel(distToNextKm) : null;
-      return { time: TIME_SLOTS[i] || `${8 + i * 2}:00 AM`, title: place.name, districtName: place.districtName, duration: mapActivityType(place.type) === 'nature' ? '3 hrs' : '2 hrs', type: mapActivityType(place.type), rating: place.rating, entryFee: place.entryFee, tips: place.tips, distToNextKm, driveToNext };
+      return { time: TIME_SLOTS[i] || `${8 + i * 2}:00 AM`, title: place.name, districtName: place.districtName, durationHrs: mapActivityType(place.type) === 'nature' ? 3 : 2, type: mapActivityType(place.type), rating: place.rating, entryFee: place.entryFee, tips: place.tips, distToNextKm, driveToNext };
     });
     const totalDayKm = activities.reduce((sum, a) => sum + (a.distToNextKm || 0), 0);
     itinerary.push({ day, title: `Day ${day} — ${uniqueDistricts.join(' & ')} Region`, uniqueDistricts, totalDayKm, activities });
@@ -498,6 +504,8 @@ const ALL_DISTRICTS = [
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AITripPlanner() {
+  const { lang, setLang, t } = useLanguage();
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -518,6 +526,7 @@ export default function AITripPlanner() {
   const [viewingDistrictPlaces, setViewingDistrictPlaces] = useState(null);
   const districtColorIndexRef = useRef({});
   const districtColorCounterRef = useRef(0);
+  const deleteTokensRef = useRef({});
 
   // ── STEP 2: Lightbox state ──────────────────────────────────────────────────
   const [lightbox, setLightbox] = useState(null);
@@ -591,8 +600,9 @@ export default function AITripPlanner() {
     const lq = query.toLowerCase();
     const results = [];
     districts.forEach(d => {
-      if (d.name.toLowerCase().includes(lq) || d.desc.toLowerCase().includes(lq))
-        results.push({ type: 'district', data: d, matchedText: d.name });
+      const dl = localizeDistrict(lang, d);
+      if (d.name.toLowerCase().includes(lq) || dl.name.toLowerCase().includes(lq) || d.desc.toLowerCase().includes(lq) || dl.desc.toLowerCase().includes(lq))
+        results.push({ type: 'district', data: d, matchedText: dl.name });
       d.touristPlaces.forEach(p => {
         if (p.name.toLowerCase().includes(lq) || p.type.toLowerCase().includes(lq) || (p.shortDesc && p.shortDesc.toLowerCase().includes(lq)))
           results.push({ type: 'place', data: p, district: d, matchedText: p.name });
@@ -677,44 +687,35 @@ export default function AITripPlanner() {
         .filter(p => !itineraryNames.has(p.name))
         .map(p => ({ ...p, _score: recScore(p) }))
         .sort((a, b) => b._score - a._score);
-      const personalizedPicks = scoredPlaces.slice(0, 6).map(p => ({
-        name: p.name,
-        district: p.districtName,
-        type: p.type,
-        score: p._score,
-        reason: p._score > 6 ? 'Strong match for your interests' : p._score > 4 ? 'Highly rated by travellers' : 'Popular nearby pick',
-        rating: p.rating,
-        entryFee: p.entryFee,
-      }));
-      const picksWithReason = personalizedPicks.map(p => {
-        const reasons = [];
-        if (interests.some(i => (INTEREST_TYPE_MAP[i] || []).some(t => p.type?.toLowerCase().includes(t.toLowerCase())))) reasons.push('matches your interests');
-        if ((p.rating || 0) >= 4.5) reasons.push('top-rated');
-        if ((p.entryFee || '').toLowerCase() === 'free') reasons.push('free entry');
-        if (visitedDistricts.has(p.district)) reasons.push(`in ${p.district}`);
-        return { ...p, reason: reasons.length ? reasons.join(' / ') : 'recommended for you' };
+      const personalizedPicks = scoredPlaces.slice(0, 6).map(p => {
+        const reasons = [p._score > 6 ? 'pick.reason.strong' : p._score > 4 ? 'pick.reason.top' : 'pick.reason.popular'];
+        if (interests.some(i => (INTEREST_TYPE_MAP[i] || []).some(t => p.type?.toLowerCase().includes(t.toLowerCase())))) reasons.push('pick.reason.match');
+        if ((p.rating || 0) >= 4.5) reasons.push('pick.reason.toprated');
+        if ((p.entryFee || '').toLowerCase() === 'free') reasons.push('pick.reason.free');
+        if (visitedDistricts.has(p.districtName)) reasons.push('pick.reason.in');
+        return { name: p.name, district: p.districtName, type: p.type, score: p._score, reasons, rating: p.rating, entryFee: p.entryFee };
       });
 
       // ── TIPS & RECOMMENDATIONS ──────────────────────────────────────────────
       const recs = [];
-      if (interests.includes('nature') || interests.includes('ecotourism')) recs.push({ title: 'Book Wildlife Safaris in Advance', reason: 'Limited daily permits available at most sanctuaries', icon: '🦁' });
-      if (interests.includes('tribal') || interests.includes('localculture')) recs.push({ title: 'Always Hire Local Tribal Guides', reason: 'Cultural accuracy, community income, and access to hidden sites', icon: '🏹' });
-      if (interests.includes('tribal')) recs.push({ title: 'Buy Crafts Directly from Artisans', reason: 'Dhokra, Gond art and bamboo work purchased at source supports families', icon: '🎨' });
-      if (interests.includes('ecotourism')) recs.push({ title: 'Stay in Community Homestays', reason: '40% of revenue goes to village conservation funds', icon: '🏡' });
-      if (budget === 'budget') recs.push({ title: 'Stay in Government Rest Houses', reason: 'Save 40% on accommodation costs', icon: '💰' });
-      if (interests.includes('spiritual')) recs.push({ title: 'Visit Temples at Early Morning', reason: 'Peaceful darshan and avoid large crowds', icon: '🛕' });
-      recs.push({ title: 'Carry Cash in Remote Areas', reason: 'ATMs are sparse in forest and tribal zones', icon: '💵' });
+      if (interests.includes('nature') || interests.includes('ecotourism')) recs.push({ k: 'safari', icon: '🦁' });
+      if (interests.includes('tribal') || interests.includes('localculture')) recs.push({ k: 'guide', icon: '🏹' });
+      if (interests.includes('tribal')) recs.push({ k: 'crafts', icon: '🎨' });
+      if (interests.includes('ecotourism')) recs.push({ k: 'homestay', icon: '🏡' });
+      if (budget === 'budget') recs.push({ k: 'resthouse', icon: '💰' });
+      if (interests.includes('spiritual')) recs.push({ k: 'temple', icon: '🛕' });
+      recs.push({ k: 'cash', icon: '💵' });
 
       // ── RESPONSIBLE TRAVEL TIPS ─────────────────────────────────────────────
       const responsibleTips = [];
       if (interests.includes('tribal') || interests.includes('localculture')) {
-        responsibleTips.push({ icon: '📸', tip: 'Always ask permission before photographing tribal people, rituals, or sacred spaces' });
-        responsibleTips.push({ icon: '🤝', tip: 'Engage respectfully — learn 2–3 words of the local tribal language before visiting' });
-        responsibleTips.push({ icon: '💰', tip: 'Pay fair prices for crafts and experiences — aggressive bargaining harms livelihoods' });
+        responsibleTips.push({ k: 'rt1', icon: '📸' });
+        responsibleTips.push({ k: 'rt2', icon: '🤝' });
+        responsibleTips.push({ k: 'rt3', icon: '💰' });
       }
       if (interests.includes('ecotourism') || interests.includes('nature')) {
-        responsibleTips.push({ icon: '🌿', tip: 'Zero waste in forests — every piece of rubbish must be carried back out' });
-        responsibleTips.push({ icon: '🔇', tip: 'Silence is a virtue in forest zones — wildlife thrives when visitors are quiet' });
+        responsibleTips.push({ k: 'rt4', icon: '🌿' });
+        responsibleTips.push({ k: 'rt5', icon: '🔇' });
       }
 
       // ── INSIGHTS ────────────────────────────────────────────────────────────
@@ -722,16 +723,16 @@ export default function AITripPlanner() {
       const startDist = districts.find(d => d.name === startingDistrict);
       const startPlacesDay1 = itinerary[0]?.activities.filter(a => a.districtName === startingDistrict).length || 0;
       const insights = [
-        `Your journey starts in ${startingDistrict}${startDist ? ` — ${startDist.highlights}` : ''}. Day 1 covers ${startPlacesDay1} place${startPlacesDay1 !== 1 ? 's' : ''} right in your starting district.`,
-        `The route expands outward from ${startingDistrict} each day, reaching ${districtsCovered.size} district${districtsCovered.size !== 1 ? 's' : ''} over ${tripDuration} day${tripDuration !== 1 ? 's' : ''} — minimising unnecessary backtracking.`,
-        `With a ${pace} pace (${SLOTS_PER_DAY[pace]} places/day), you'll spend quality time at each stop rather than rushing between them.`,
-        `Total travel distance: ~${totalDayKm.toLocaleString()} km across ${tripDuration} day${tripDuration !== 1 ? 's' : ''}.`,
-        ...(interests.includes('tribal') ? [`Tribal-interest scoring prioritises Dhokra workshops, tribal trails, and community markets in Bastar, Kondagaon, and Surguja districts.`] : []),
-        ...(interests.includes('ecotourism') ? [`Eco-tourism routing favours forest lodges, nature camps, and wildlife sanctuaries with community conservation programmes.`] : []),
-        `October–March is peak season for all activities in Chhattisgarh — roads are dry, wildlife is active, and temperatures are comfortable.`,
+        { k: 'planner.ins1', p: { district: startingDistrict, hl: startDist ? ` — ${startDist.highlights}` : '', count: startPlacesDay1 } },
+        { k: 'planner.ins2', p: { district: startingDistrict, dc: districtsCovered.size, days: tripDuration } },
+        { k: 'planner.ins3', p: { paceKey: `planner.step2.pace-${pace}`, slots: SLOTS_PER_DAY[pace] } },
+        { k: 'planner.ins4', p: { km: totalDayKm.toLocaleString(), days: tripDuration } },
+        ...(interests.includes('tribal') ? [{ k: 'planner.ins5-tribal', p: {} }] : []),
+        ...(interests.includes('ecotourism') ? [{ k: 'planner.ins5-eco', p: {} }] : []),
+        { k: 'planner.ins6', p: {} },
       ];
 
-      setTripRecommendations({ itinerary, estimatedCost, personalizedPicks: picksWithReason, recommendations: recs, responsibleTips, insights });
+      setTripRecommendations({ itinerary, estimatedCost, personalizedPicks, recommendations: recs, responsibleTips, insights });
       setIsAnalyzing(false);
       setPlanningStep(5);
     }, 2200);
@@ -792,6 +793,9 @@ export default function AITripPlanner() {
         interests,
         itinerary: tripRecommendations,
       });
+      if (data && data.id && data.delete_token) {
+        deleteTokensRef.current[data.id] = data.delete_token;
+      }
       const url = buildShareUrl(data.id);
       setSavedShareUrl(url);
       setSavedTrip({ ...data, url });
@@ -836,8 +840,14 @@ export default function AITripPlanner() {
 
   const handleDeleteTrip = async (id) => {
     if (!window.confirm('Delete this saved itinerary? This cannot be undone.')) return;
+    const deleteToken = deleteTokensRef.current[id];
+    if (!deleteToken) {
+      alert('You can only delete itineraries you created in this browser session.');
+      return;
+    }
     try {
-      await deleteItinerary(id);
+      await deleteItinerary(id, deleteToken);
+      delete deleteTokensRef.current[id];
       setMyTrips(prev => prev.filter(t => t.id !== id));
     } catch (err) {
       alert(err.message || 'Could not delete itinerary.');
@@ -902,9 +912,9 @@ export default function AITripPlanner() {
         <div className="flex items-center justify-between px-4 py-2.5 rounded-xl mb-0" style={{ background: col.bg, border: `1.5px solid ${col.border}` }}>
           <div className="flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: col.dot }} />
-            <span className="font-bold text-sm" style={{ color: col.text }}>{districtName} District</span>
+            <span className="font-bold text-sm" style={{ color: col.text }}>{localizeDistrict(lang, { name: districtName }).name} {t('dest.district-suffix')}</span>
           </div>
-          <span className="text-xs font-medium" style={{ color: col.text }}>{places.length} {places.length === 1 ? 'place' : 'places'}</span>
+          <span className="text-xs font-medium" style={{ color: col.text }}>{t('planner.place-label', { count: places.length })}</span>
         </div>
         <div className="border rounded-xl overflow-hidden mt-1.5" style={{ borderColor: col.border }}>
           {places.map((act, i) => (
@@ -912,14 +922,14 @@ export default function AITripPlanner() {
               <div className="activity-row flex gap-3 items-start px-4 py-3 bg-white">
                 <div className="bg-orange-100 text-orange-700 px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap flex-shrink-0 mt-0.5">{act.time}</div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-800 text-sm leading-snug">{act.title}</p>
+                  <p className="font-semibold text-gray-800 text-sm leading-snug">{localizePlaceName(lang, { name: act.title })}</p>
                   <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
-                    <span className="text-xs text-gray-400">{act.duration}</span>
+                    <span className="text-xs text-gray-400">{act.durationHrs ? t('planner.hrs', { n: act.durationHrs }) : act.duration}</span>
                     {act.rating && (<><span className="text-xs text-gray-300">·</span><span className="text-xs text-yellow-600 font-medium">★ {act.rating}</span></>)}
                     {act.entryFee && (<><span className="text-xs text-gray-300">·</span><span className="text-xs text-gray-400">🎟 {act.entryFee}</span></>)}
                   </div>
                 </div>
-                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold flex-shrink-0 ${TYPE_COLORS[act.type] || 'bg-gray-100 text-gray-700'}`}>{act.type}</span>
+                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold flex-shrink-0 ${TYPE_COLORS[act.type] || 'bg-gray-100 text-gray-700'}`}>{TYPE_LABEL_KEY[act.type] ? t(TYPE_LABEL_KEY[act.type]) : act.type}</span>
               </div>
               {i < places.length - 1 && act.distToNextKm != null && (<DistanceConnector km={act.distToNextKm} driveLabel={act.driveToNext} />)}
             </React.Fragment>
@@ -936,18 +946,18 @@ export default function AITripPlanner() {
       <div className="bg-white border-2 border-gray-100 rounded-2xl overflow-hidden day-card">
         <div className="bg-gradient-to-r from-orange-50 to-red-50 px-5 py-3 flex items-center justify-between gap-3">
           <div>
-            <h4 className="font-bold text-lg text-orange-700">{day.title}</h4>
+            <h4 className="font-bold text-lg text-orange-700">{day.day == null ? day.title : t('planner.day-title', { date: day.day, region: day.uniqueDistricts.map(d => localizeDistrict(lang, { name: d }).name).join(' & ') })}</h4>
             <div className="flex flex-wrap gap-1 mt-1">
               {day.uniqueDistricts.map(d => (
                 <span key={d} className="text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1" style={{ background: getDistrictColor(d).bg, color: getDistrictColor(d).text, border: `1px solid ${getDistrictColor(d).border}` }}>
-                  <MapPin size={10} />{d}
+                  <MapPin size={10} />{localizeDistrict(lang, { name: d }).name}
                 </span>
               ))}
             </div>
           </div>
           <div className="text-right flex flex-col items-end gap-1 flex-shrink-0">
-            <span className="text-xs text-gray-500">{day.activities.length} stops</span>
-            {day.totalDayKm > 0 && (<span className="flex items-center gap-1 text-xs font-semibold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full"><Navigation size={10} />{day.totalDayKm} km total</span>)}
+            <span className="text-xs text-gray-500">{t('planner.stops-label', { count: day.activities.length })}</span>
+            {day.totalDayKm > 0 && (<span className="flex items-center gap-1 text-xs font-semibold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full"><Navigation size={10} />{t('planner.km-label', { km: day.totalDayKm })}</span>)}
           </div>
         </div>
         <div className="p-4 space-y-1">
@@ -959,6 +969,14 @@ export default function AITripPlanner() {
         </div>
       </div>
     );
+  };
+
+  const renderInsight = (ins) => {
+    if (!ins || typeof ins === 'string') return ins;
+    const p = { ...ins.p };
+    p.district = p.district ? localizeDistrict(lang, { name: p.district }).name : p.district;
+    p.pace = p.paceKey ? t(p.paceKey) : p.pace;
+    return t(ins.k, p);
   };
 
   const totalPlaces = districts.reduce((s, d) => s + d.touristPlaces.length, 0);
@@ -986,30 +1004,57 @@ export default function AITripPlanner() {
         <div className="max-w-7xl mx-auto px-4 flex justify-between items-center">
           <div className="flex items-center space-x-2">
             <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center"><MapPin className="text-white" size={24} /></div>
-            <span className={`font-bold text-xl ${scrolled ? 'text-gray-800' : 'text-white'}`}>Incredible Chhattisgarh</span>
+            <span className={`font-bold text-xl ${scrolled ? 'text-gray-800' : 'text-white'}`}>{t('brand')}</span>
           </div>
           <div className="hidden md:flex space-x-8">
-            {[{ label: 'Destinations', anchor: '#destinations' }, { label: 'Tribal & Eco', anchor: '#tribal-eco' }, { label: 'Plan Trip', anchor: null }].map((item, i) => (
+            {[{ key: 'nav.destinations', anchor: '#destinations' }, { key: 'nav.tribal-eco', anchor: '#tribal-eco' }, { key: 'nav.plan-trip', anchor: null }].map((item, i) => (
               <a key={i} href={item.anchor || '#'} onClick={e => { if (!item.anchor) { e.preventDefault(); setShowTripPlanner(true); } else { e.preventDefault(); document.getElementById(item.anchor.slice(1))?.scrollIntoView({ behavior: 'smooth' }); } }}
-                className={`font-medium hover:text-orange-500 transition-colors ${scrolled ? 'text-gray-700' : 'text-white'}`}>{item.label}</a>
+                className={`font-medium hover:text-orange-500 transition-colors ${scrolled ? 'text-gray-700' : 'text-white'}`}>{t(item.key)}</a>
             ))}
           </div>
-          <button onClick={() => setShowTripPlanner(true)} className={`hidden md:flex items-center gap-2 px-6 py-2 rounded-full font-semibold transition-all ${scrolled ? 'bg-gradient-to-r from-orange-500 to-red-600 text-white hover:shadow-lg' : 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-md'}`}>
-            <Sparkles size={20} />Plan My Trip
-          </button>
-          <button onClick={loadMyTrips} className={`hidden md:flex items-center gap-2 px-5 py-2 rounded-full font-semibold transition-all border ${scrolled ? 'border-orange-200 text-orange-700 hover:bg-orange-50' : 'border-white/30 text-white hover:bg-white/10 backdrop-blur-md'}`}>
-            <Bookmark size={18} />My Trips
-          </button>
-          <button onClick={() => setMenuOpen(!menuOpen)} className={`md:hidden p-2 rounded-lg ${scrolled ? 'text-gray-800' : 'text-white'}`}>
-            {menuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <button onClick={() => setLangMenuOpen(o => !o)} title={t('lang.label')} className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-semibold text-sm transition-all border ${scrolled ? 'border-gray-200 text-gray-700 hover:bg-gray-50' : 'border-white/30 text-white hover:bg-white/10 backdrop-blur-md'}`}>
+                <Globe size={18} /><span className="hidden sm:inline">{LANGUAGES.find(l => l.code === lang)?.short}</span>
+                <ChevronDown size={14} />
+              </button>
+              {langMenuOpen && (
+                <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 z-50">
+                  {LANGUAGES.map(l => (
+                    <button key={l.code} onClick={() => { setLang(l.code); setLangMenuOpen(false); }}
+                      className={`w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-orange-50 ${lang === l.code ? 'font-bold text-orange-600' : 'text-gray-700'}`}>
+                      <span>{l.flag}</span><span className="flex-1">{l.label}</span>{lang === l.code && <Check size={14} />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button onClick={() => setShowTripPlanner(true)} className={`hidden md:flex items-center gap-2 px-6 py-2 rounded-full font-semibold transition-all ${scrolled ? 'bg-gradient-to-r from-orange-500 to-red-600 text-white hover:shadow-lg' : 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-md'}`}>
+              <Sparkles size={20} />{t('nav.plan-my-trip')}
+            </button>
+            <button onClick={loadMyTrips} className={`hidden md:flex items-center gap-2 px-5 py-2 rounded-full font-semibold transition-all border ${scrolled ? 'border-orange-200 text-orange-700 hover:bg-orange-50' : 'border-white/30 text-white hover:bg-white/10 backdrop-blur-md'}`}>
+              <Bookmark size={18} />{t('nav.my-trips')}
+            </button>
+            <button onClick={() => setMenuOpen(!menuOpen)} className={`md:hidden p-2 rounded-lg ${scrolled ? 'text-gray-800' : 'text-white'}`}>
+              {menuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
         </div>
         {menuOpen && (
           <div className="md:hidden bg-white shadow-lg mt-2 py-4 px-4 space-y-3">
-            {['Destinations', 'Plan Trip'].map(item => (
-              <a key={item} href="#" onClick={e => { e.preventDefault(); if (item === 'Plan Trip') setShowTripPlanner(true); setMenuOpen(false); }} className="block py-2 text-gray-700 hover:text-orange-500 font-medium">{item}</a>
+            {[{ key: 'nav.destinations', anchor: '#destinations', action: null }, { key: 'nav.plan-trip', anchor: null, action: 'planner' }].map(item => (
+              <a key={item.key} href="#" onClick={e => { e.preventDefault(); if (item.action === 'planner') setShowTripPlanner(true); else document.getElementById(item.anchor.slice(1))?.scrollIntoView({ behavior: 'smooth' }); setMenuOpen(false); }} className="block py-2 text-gray-700 hover:text-orange-500 font-medium">{t(item.key)}</a>
             ))}
-            <button onClick={() => { loadMyTrips(); setMenuOpen(false); }} className="flex items-center gap-2 w-full text-left py-2 text-gray-700 hover:text-orange-500 font-medium"><Bookmark size={18} />My Trips</button>
+            <button onClick={() => { loadMyTrips(); setMenuOpen(false); }} className="flex items-center gap-2 w-full text-left py-2 text-gray-700 hover:text-orange-500 font-medium"><Bookmark size={18} />{t('nav.my-trips')}</button>
+            <div className="pt-2 border-t border-gray-100">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">{t('lang.label')}</p>
+              <div className="flex flex-wrap gap-2">
+                {LANGUAGES.map(l => (
+                  <button key={l.code} onClick={() => { setLang(l.code); setMenuOpen(false); }}
+                    className={`px-3 py-1.5 rounded-full text-sm font-semibold border ${lang === l.code ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-700 border-gray-200'}`}>{l.flag} {l.label}</button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </nav>
@@ -1025,13 +1070,13 @@ export default function AITripPlanner() {
         <div className="absolute inset-0 flex items-center justify-center text-center">
           <div className="text-white px-4 fade-in w-full max-w-4xl">
             <h1 className="text-6xl md:text-8xl font-bold mb-4">Chhattisgarh</h1>
-            <p className="text-2xl md:text-4xl mb-8 font-light">Unravel the mesmerising beauty</p>
+            <p className="text-2xl md:text-4xl mb-8 font-light">{t('hero.tagline')}</p>
             <div className="mb-8 relative" ref={searchRef}>
               <div className="relative max-w-3xl mx-auto">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={24} />
                 <input type="text" value={searchQuery} onChange={e => { setSearchQuery(e.target.value); performSearch(e.target.value); setShowSearchResults(true); }}
                   onFocus={() => setShowSearchResults(true)}
-                  placeholder={`Search ${totalPlaces}+ places across all 33 districts...`}
+                  placeholder={t('hero.search-cta')}
                   className="w-full pl-14 pr-4 py-4 rounded-full text-gray-800 text-lg focus:outline-none focus:ring-4 focus:ring-orange-300 shadow-2xl" />
                 {searchQuery && <button onClick={() => { setSearchQuery(''); setSearchResults([]); setShowSearchResults(false); }} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"><X size={20} /></button>}
                 {showSearchResults && searchResults.length > 0 && (
@@ -1044,8 +1089,8 @@ export default function AITripPlanner() {
                             <ImgWithFallback src={r.data.image} alt="" className="w-full h-full object-cover" districtName={r.type === 'district' ? r.data.name : r.district?.name} />
                           </div>
                           <div className="flex-1">
-                            <p className="font-bold text-gray-800">{r.data.name}</p>
-                            <p className="text-sm text-gray-600">{r.type === 'district' ? r.data.desc : `${r.data.type} · ${r.district?.name} District`}</p>
+                            <p className="font-bold text-gray-800">{r.type === 'district' ? localizeDistrict(lang, r.data).name : localizePlaceName(lang, r.data)}</p>
+                            <p className="text-sm text-gray-600">{r.type === 'district' ? localizeDistrict(lang, r.data).desc : `${r.data.type} · ${localizeDistrict(lang, r.district).name} ${t('dest.district-suffix')}`}</p>
                           </div>
                           <ChevronRight className="text-gray-400" size={20} />
                         </div>
@@ -1057,13 +1102,13 @@ export default function AITripPlanner() {
             </div>
             <div className="flex gap-4 justify-center flex-wrap">
               <button onClick={() => setShowTripPlanner(true)} className="px-8 py-4 bg-gradient-to-r from-orange-500 to-red-600 rounded-full font-semibold hover:shadow-2xl hover:scale-105 transition-all flex items-center gap-2">
-                <Sparkles size={24} />Plan My Route
+                <Sparkles size={24} />{t('hero.plan-route')}
               </button>
               <button onClick={() => document.getElementById('tribal-eco')?.scrollIntoView({ behavior: 'smooth' })} className="px-8 py-4 bg-amber-500/90 backdrop-blur-md rounded-full font-semibold hover:bg-amber-500 transition-all flex items-center gap-2">
-                🏹 Tribal & Eco
+                {t('hero.tribal-eco')}
               </button>
               <button onClick={() => window.scrollTo({ top: document.getElementById('destinations')?.offsetTop || 0, behavior: 'smooth' })} className="px-8 py-4 bg-white/20 backdrop-blur-md rounded-full font-semibold hover:bg-white/30 transition-all">
-                Explore All 33 Districts
+                {t('hero.explore-all')}
               </button>
             </div>
           </div>
@@ -1078,10 +1123,10 @@ export default function AITripPlanner() {
       {/* ── STATS BAR ── */}
       <div className="bg-gradient-to-r from-orange-500 to-red-600 py-6">
         <div className="max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-6 text-white text-center">
-          <div><div className="text-3xl font-bold">33</div><div className="text-sm opacity-90">Districts</div></div>
-          <div><div className="text-3xl font-bold">{totalPlaces}+</div><div className="text-sm opacity-90">Tourist Places</div></div>
-          <div><div className="text-3xl font-bold">44</div><div className="text-sm opacity-90">Wildlife Sanctuaries</div></div>
-          <div><div className="text-3xl font-bold">5</div><div className="text-sm opacity-90">National Parks</div></div>
+          <div><div className="text-3xl font-bold">33</div><div className="text-sm opacity-90">{t('stats.districts')}</div></div>
+          <div><div className="text-3xl font-bold">{totalPlaces}+</div><div className="text-sm opacity-90">{t('stats.places')}</div></div>
+          <div><div className="text-3xl font-bold">44</div><div className="text-sm opacity-90">{t('stats.wildlife')}</div></div>
+          <div><div className="text-3xl font-bold">5</div><div className="text-sm opacity-90">{t('stats.national-parks')}</div></div>
         </div>
       </div>
 
@@ -1089,55 +1134,55 @@ export default function AITripPlanner() {
       <div id="tribal-eco" className="py-20 bg-gradient-to-b from-amber-50 via-green-50 to-white">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-14">
-            <div className="inline-flex items-center gap-2 bg-amber-100 text-amber-800 text-sm font-bold px-4 py-1.5 rounded-full mb-4 border border-amber-200"><span>🏹</span> Authentic Experiences</div>
-            <h2 className="text-4xl md:text-5xl font-bold mb-4"><span className="gradient-text">Tribal · Eco · Culture</span></h2>
-            <p className="text-gray-600 text-lg max-w-2xl mx-auto">Chhattisgarh is home to 42 tribal communities, ancient living traditions, and some of India's most pristine forests.</p>
+            <div className="inline-flex items-center gap-2 bg-amber-100 text-amber-800 text-sm font-bold px-4 py-1.5 rounded-full mb-4 border border-amber-200"><span>🏹</span>{t('tribal.badge')}</div>
+            <h2 className="text-4xl md:text-5xl font-bold mb-4"><span className="gradient-text">{t('tribal.title')}</span></h2>
+            <p className="text-gray-600 text-lg max-w-2xl mx-auto">{t('tribal.subtitle')}</p>
           </div>
           <div className="grid md:grid-cols-3 gap-6 mb-14">
             {[
-              { icon: '🏹', title: 'Tribal Tourism', bg: 'from-amber-500 to-orange-500', lightBg: 'bg-amber-50', border: 'border-amber-200', textColor: 'text-amber-800', stats: '42 tribes', desc: 'Chhattisgarh is one of India\'s richest tribal homelands. Gondi, Maria, Muria, Halba and Bhatra communities have preserved art forms, rituals and ways of life for thousands of years.', highlights: ['Dhokra metal casting', 'Gond & Warli painting', 'Bastar Dussehra festival', 'Tribal weekly haats', 'Abujhmaad forest trail'] },
-              { icon: '🌿', title: 'Eco Tourism', bg: 'from-green-500 to-teal-600', lightBg: 'bg-green-50', border: 'border-green-200', textColor: 'text-green-800', stats: '44 sanctuaries', desc: 'Forest cover, tiger reserves, elephant corridors, rare caves and pristine rivers make Chhattisgarh a world-class eco-tourism destination.', highlights: ['Tiger & leopard safaris', 'Kanger Valley caves', 'Achanakmar forest stays', 'Bird-watching circuits', 'River camping'] },
-              { icon: '🎭', title: 'Local Culture', bg: 'from-violet-500 to-purple-600', lightBg: 'bg-violet-50', border: 'border-violet-200', textColor: 'text-violet-800', stats: '36 folk art forms', desc: 'Panthi dance, Raut Nacha, Karma festival, Pandwani music — Chhattisgarh\'s performing arts are a direct window into one of India\'s most distinctive cultural landscapes.', highlights: ['Panthi & Raut Nacha dance', 'Pandwani folk music', 'Karma & Hareli festivals', 'Village temple fairs', 'Traditional cuisine trails'] },
+              { icon: '🏹', k: 'tribal.pill.tribal', bg: 'from-amber-500 to-orange-500', lightBg: 'bg-amber-50', border: 'border-amber-200', textColor: 'text-amber-800' },
+              { icon: '🌿', k: 'tribal.pill.eco', bg: 'from-green-500 to-teal-600', lightBg: 'bg-green-50', border: 'border-green-200', textColor: 'text-green-800' },
+              { icon: '🎭', k: 'tribal.pill.culture', bg: 'from-violet-500 to-purple-600', lightBg: 'bg-violet-50', border: 'border-violet-200', textColor: 'text-violet-800' },
             ].map(pillar => (
-              <div key={pillar.title} className={`${pillar.lightBg} border ${pillar.border} rounded-2xl overflow-hidden`}>
+              <div key={pillar.k} className={`${pillar.lightBg} border ${pillar.border} rounded-2xl overflow-hidden`}>
                 <div className={`bg-gradient-to-r ${pillar.bg} p-6 text-white`}>
                   <div className="text-4xl mb-2">{pillar.icon}</div>
-                  <h3 className="text-2xl font-bold">{pillar.title}</h3>
-                  <div className="text-white/80 text-sm font-semibold mt-1">{pillar.stats}</div>
+                  <h3 className="text-2xl font-bold">{t(`${pillar.k}.title`)}</h3>
+                  <div className="text-white/80 text-sm font-semibold mt-1">{t(`${pillar.k}.stats`)}</div>
                 </div>
                 <div className="p-5">
-                  <p className={`text-sm ${pillar.textColor} leading-relaxed mb-4`}>{pillar.desc}</p>
-                  <ul className="space-y-1.5">{pillar.highlights.map(h => (<li key={h} className="flex items-center gap-2 text-sm text-gray-700"><Check size={14} className={pillar.textColor} />{h}</li>))}</ul>
+                  <p className={`text-sm ${pillar.textColor} leading-relaxed mb-4`}>{t(`${pillar.k}.desc`)}</p>
+                  <ul className="space-y-1.5">{[1, 2, 3, 4, 5].map(i => (<li key={i} className="flex items-center gap-2 text-sm text-gray-700"><Check size={14} className={pillar.textColor} />{t(`${pillar.k}.h${i}`)}</li>))}</ul>
                 </div>
               </div>
             ))}
           </div>
           <div className="mb-8">
-            <h3 className="text-2xl font-bold text-gray-800 mb-2">Curated Experiences</h3>
-            <p className="text-gray-500 text-sm mb-6">Hand-picked immersive encounters — each one puts money directly into local community hands</p>
+            <h3 className="text-2xl font-bold text-gray-800 mb-2">{t('tribal.experiences')}</h3>
+            <p className="text-gray-500 text-sm mb-6">{t('tribal.experiences-sub')}</p>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
               {TRIBAL_ECO_EXPERIENCES.map(exp => (
                 <div key={exp.id} className="bg-white rounded-2xl overflow-hidden shadow-md card-hover border border-gray-100">
                   <div className="relative h-40 overflow-hidden">
-                    <ImgWithFallback src={exp.image} alt={exp.title} className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" />
+                    <ImgWithFallback src={exp.image} alt={t(`tribal.exp.${exp.id}.title`)} className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                     <div className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-xs font-bold ${exp.category === 'tribal' ? 'bg-amber-400 text-amber-900' : exp.category === 'ecotourism' ? 'bg-green-400 text-green-900' : 'bg-violet-400 text-violet-900'}`}>
-                      {exp.icon} {exp.category === 'tribal' ? 'Tribal' : exp.category === 'ecotourism' ? 'Eco' : 'Culture'}
+                      {exp.icon} {t(exp.category === 'tribal' ? 'cat.tribal' : exp.category === 'ecotourism' ? 'cat.eco' : 'cat.culture')}
                     </div>
                     <div className="absolute bottom-3 left-3 right-3">
-                      <p className="text-white font-bold text-sm leading-tight">{exp.title}</p>
-                      <p className="text-white/70 text-xs">{exp.district} District</p>
+                      <p className="text-white font-bold text-sm leading-tight">{t(`tribal.exp.${exp.id}.title`)}</p>
+                      <p className="text-white/70 text-xs">{localizeDistrict(lang, { name: exp.district }).name} {t('dest.district-suffix')}</p>
                     </div>
                   </div>
                   <div className="p-4">
-                    <p className="text-xs text-gray-500 leading-relaxed mb-3 line-clamp-3">{exp.description}</p>
+                    <p className="text-xs text-gray-500 leading-relaxed mb-3 line-clamp-3">{t(`tribal.exp.${exp.id}.desc`)}</p>
                     <div className="flex items-center gap-3 mb-3 flex-wrap">
-                      <span className="text-xs font-semibold text-gray-600 flex items-center gap-1"><Clock size={11} />{exp.duration}</span>
-                      <span className="text-xs font-semibold text-gray-600">{exp.bestFor}</span>
+                      <span className="text-xs font-semibold text-gray-600 flex items-center gap-1"><Clock size={11} />{t(`tribal.exp.${exp.id}.duration`)}</span>
+                      <span className="text-xs font-semibold text-gray-600">{t(`tribal.exp.${exp.id}.bestfor`)}</span>
                     </div>
                     <div className="bg-teal-50 border border-teal-100 rounded-lg px-3 py-2 flex gap-2 items-start">
                       <span className="text-sm flex-shrink-0">♻️</span>
-                      <p className="text-xs text-teal-700 leading-snug">{exp.responsibleTip}</p>
+                      <p className="text-xs text-teal-700 leading-snug">{t(`tribal.exp.${exp.id}.rtip`)}</p>
                     </div>
                   </div>
                 </div>
@@ -1148,20 +1193,20 @@ export default function AITripPlanner() {
             <div className="flex items-start gap-4">
               <div className="text-4xl flex-shrink-0">🌱</div>
               <div>
-                <h3 className="text-2xl font-bold mb-2">Our Responsible Tourism Pledge</h3>
-                <p className="text-teal-100 text-sm mb-5 max-w-2xl">Tourism in Chhattisgarh's tribal and forest regions carries a special responsibility.</p>
+                <h3 className="text-2xl font-bold mb-2">{t('tribal.pledge')}</h3>
+                <p className="text-teal-100 text-sm mb-5 max-w-2xl">{t('tribal.pledge-sub')}</p>
                 <div className="grid md:grid-cols-2 gap-3">
                   {[
-                    { icon: '🤝', text: 'Always engage authorised local guides from tribal communities' },
-                    { icon: '💰', text: 'Buy crafts and food directly from artisans and village producers' },
-                    { icon: '📸', text: 'Ask permission before photographing people, shrines, or rituals' },
-                    { icon: '🌿', text: 'Leave no trace in forests — all waste must be carried out' },
-                    { icon: '🏠', text: 'Prefer community homestays over outside-owned resorts' },
-                    { icon: '🤐', text: 'Respect sacred spaces — follow dress codes and no-entry signs' },
+                    { icon: '🤝', k: 'p1' },
+                    { icon: '💰', k: 'p2' },
+                    { icon: '📸', k: 'p3' },
+                    { icon: '🌿', k: 'p4' },
+                    { icon: '🏠', k: 'p5' },
+                    { icon: '🤐', k: 'p6' },
                   ].map((p, i) => (
                     <div key={i} className="flex items-start gap-2.5 bg-white/10 rounded-xl px-3 py-2.5">
                       <span className="text-lg flex-shrink-0">{p.icon}</span>
-                      <p className="text-sm text-teal-50">{p.text}</p>
+                      <p className="text-sm text-teal-50">{t(`tribal.${p.k}`)}</p>
                     </div>
                   ))}
                 </div>
@@ -1187,22 +1232,25 @@ export default function AITripPlanner() {
             ))}
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredDestinations.map((dest, idx) => (
+            {filteredDestinations.map((dest, idx) => {
+              const dl = localizeDistrict(lang, dest);
+              return (
               <div key={idx} className="bg-white rounded-2xl overflow-hidden shadow-lg card-hover cursor-pointer fade-in" onClick={() => setViewingDistrictPlaces(dest)}>
                 <div className="relative h-56 overflow-hidden">
-                  <ImgWithFallback src={dest.image} alt={dest.name} className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" districtName={dest.name} />
-                  <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-semibold text-orange-600">{dest.highlights}</div>
-                  <div className="absolute bottom-4 left-4 bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold">{dest.touristPlaces.length} Places</div>
+                  <ImgWithFallback src={dest.image} alt={dl.name} className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" districtName={dest.name} />
+                  <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-semibold text-orange-600">{dl.highlights}</div>
+                  <div className="absolute bottom-4 left-4 bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold">{t('dest.places-count', { count: dest.touristPlaces.length })}</div>
                 </div>
                 <div className="p-5">
-                  <h3 className="text-xl font-bold mb-1">{dest.name}</h3>
-                  <p className="text-gray-600 text-sm mb-3">{dest.desc}</p>
+                  <h3 className="text-xl font-bold mb-1">{dl.name}</h3>
+                  <p className="text-gray-600 text-sm mb-3">{dl.desc}</p>
                   <div className="flex items-center gap-2 text-orange-600 font-semibold text-sm group">
-                    Explore {dest.touristPlaces.length} places <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                    {t('dest.explore-places', { count: dest.touristPlaces.length })} <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -1216,18 +1264,18 @@ export default function AITripPlanner() {
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
               <button onClick={() => setViewingDistrictPlaces(null)} className="absolute top-4 right-4 bg-white/20 backdrop-blur-md p-2 rounded-full hover:bg-white/30"><X className="text-white" size={24} /></button>
               <div className="absolute bottom-6 left-6 text-white">
-                <h2 className="text-3xl font-bold mb-1">{viewingDistrictPlaces.name} District</h2>
-                <p className="text-lg">{viewingDistrictPlaces.desc}</p>
+                <h2 className="text-3xl font-bold mb-1">{localizeDistrict(lang, viewingDistrictPlaces).name} {t('dest.district-suffix')}</h2>
+                <p className="text-lg">{localizeDistrict(lang, viewingDistrictPlaces).desc}</p>
                 <div className="mt-2 flex items-center gap-2">
-                  <span className="bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full">{viewingDistrictPlaces.touristPlaces.length} Tourist Places</span>
-                  <span className="bg-white/20 text-white text-xs font-bold px-3 py-1 rounded-full">{viewingDistrictPlaces.highlights}</span>
+                  <span className="bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full">{t('dest.tourist-places', { count: viewingDistrictPlaces.touristPlaces.length })}</span>
+                  <span className="bg-white/20 text-white text-xs font-bold px-3 py-1 rounded-full">{localizeDistrict(lang, viewingDistrictPlaces).highlights}</span>
                 </div>
               </div>
             </div>
             <div className="p-6 md:p-8">
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-bold text-lg text-gray-800">📍 District Map</h3>
+                  <h3 className="font-bold text-lg text-gray-800">📍 {t('dest.district-map')}</h3>
                   <a
                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(viewingDistrictPlaces.name + ', Chhattisgarh, India')}`}
                     target="_blank"
@@ -1236,7 +1284,7 @@ export default function AITripPlanner() {
                   >Open in Google Maps <ExternalLink size={11} /></a>
                 </div>
                 <GoogleMapView
-                  places={[{ name: viewingDistrictPlaces.name, district: viewingDistrictPlaces.name, lat: viewingDistrictPlaces.coordinates.lat, lng: viewingDistrictPlaces.coordinates.lng, info: `${viewingDistrictPlaces.touristPlaces.length} tourist places` }]}
+                  places={[{ name: localizeDistrict(lang, viewingDistrictPlaces).name, district: viewingDistrictPlaces.name, lat: viewingDistrictPlaces.coordinates.lat, lng: viewingDistrictPlaces.coordinates.lng, info: t('dest.tourist-places', { count: viewingDistrictPlaces.touristPlaces.length }) }]}
                   height="260px"
                   zoom={11}
                 />
@@ -1263,8 +1311,8 @@ export default function AITripPlanner() {
                         </span>
                       </div>
                       <div className="px-4 pb-4">
-                        <h4 className="font-bold text-base mb-1">{place.name}</h4>
-                        <p className="text-xs text-gray-500 mb-3">{place.shortDesc}</p>
+                        <h4 className="font-bold text-base mb-1">{localizePlaceName(lang, place)}</h4>
+                        <p className="text-xs text-gray-500 mb-3">{localizePlace(lang, place).shortDesc}</p>
                         <div className="flex items-center gap-2 mb-3">
                           <div className="flex gap-0.5">{getRatingStars(place.rating)}</div>
                           <span className="text-xs font-semibold text-gray-600">{place.rating}</span>
@@ -1272,7 +1320,7 @@ export default function AITripPlanner() {
                         <button
                           onClick={() => setSelectedPlaceDetail({ ...place, _images: placeImgs, _district: viewingDistrictPlaces.name, _coords: viewingDistrictPlaces.coordinates })}
                           className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 text-orange-600 hover:from-orange-500 hover:to-red-600 hover:text-white hover:border-transparent px-4 py-2.5 rounded-lg font-semibold text-sm transition-all">
-                          <Info size={16} />View Details
+                          <Info size={16} />{t('place.view-details')}
                         </button>
                       </div>
                     </div>
@@ -1281,9 +1329,9 @@ export default function AITripPlanner() {
               </div>
               <div className="flex gap-4 justify-center flex-wrap">
                 <button onClick={() => { setViewingDistrictPlaces(null); setShowTripPlanner(true); }} className="px-8 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full font-semibold hover:shadow-lg flex items-center gap-2">
-                  <Sparkles size={20} />Plan Trip Here
+                  <Sparkles size={20} />{t('place.plan-here')}
                 </button>
-                <button onClick={() => setViewingDistrictPlaces(null)} className="px-8 py-3 border-2 border-gray-300 rounded-full font-semibold hover:bg-gray-50">Close</button>
+                <button onClick={() => setViewingDistrictPlaces(null)} className="px-8 py-3 border-2 border-gray-300 rounded-full font-semibold hover:bg-gray-50">{t('place.close')}</button>
               </div>
             </div>
           </div>
@@ -1312,20 +1360,20 @@ export default function AITripPlanner() {
               </div>
               <div className="px-5 pt-4 pb-2">
                 <div className="inline-block bg-gradient-to-r from-orange-500 to-red-600 text-white px-3 py-1 rounded-full text-xs font-bold mb-2">{selectedPlaceDetail.type}</div>
-                <h2 className="text-2xl font-bold text-gray-900">{selectedPlaceDetail.name}</h2>
+                <h2 className="text-2xl font-bold text-gray-900">{localizePlaceName(lang, selectedPlaceDetail)}</h2>
                 <div className="flex items-center gap-2 mt-1"><div className="flex gap-0.5">{getRatingStars(selectedPlaceDetail.rating)}</div><span className="text-sm text-gray-600">{selectedPlaceDetail.rating} / 5.0</span></div>
               </div>
             </div>
             <div className="px-5 pb-6 max-h-[45vh] overflow-y-auto">
-              <p className="text-gray-700 italic mb-4 border-l-4 border-orange-500 pl-4 text-sm">{selectedPlaceDetail.shortDesc}</p>
-              <p className="text-gray-600 text-sm leading-relaxed mb-5">{selectedPlaceDetail.fullDesc}</p>
+              <p className="text-gray-700 italic mb-4 border-l-4 border-orange-500 pl-4 text-sm">{localizePlace(lang, selectedPlaceDetail).shortDesc}</p>
+              <p className="text-gray-600 text-sm leading-relaxed mb-5">{localizePlace(lang, selectedPlaceDetail).fullDesc}</p>
               <div className="grid grid-cols-2 gap-3 mb-5">
                 <div className="bg-blue-50 p-3 rounded-xl"><div className="text-xs font-bold text-blue-700 mb-1">⏰ Timings</div><p className="text-sm font-medium text-gray-700">{selectedPlaceDetail.timings}</p></div>
                 <div className="bg-green-50 p-3 rounded-xl"><div className="text-xs font-bold text-green-700 mb-1">🎟 Entry Fee</div><p className="text-sm font-medium text-gray-700">{selectedPlaceDetail.entryFee}</p></div>
                 <div className="bg-yellow-50 p-3 rounded-xl"><div className="text-xs font-bold text-yellow-700 mb-1">📅 Best Time</div><p className="text-sm font-medium text-gray-700">{selectedPlaceDetail.bestTime}</p></div>
                 <div className="bg-purple-50 p-3 rounded-xl"><div className="text-xs font-bold text-purple-700 mb-1">⭐ Rating</div><div className="flex items-center gap-1">{getRatingStars(selectedPlaceDetail.rating)}<span className="text-sm ml-1">{selectedPlaceDetail.rating}</span></div></div>
               </div>
-              {selectedPlaceDetail.tips && <div className="bg-amber-50 p-4 rounded-xl mb-4"><p className="text-xs font-bold text-amber-700 mb-1">💡 Traveler Tips</p><p className="text-sm text-gray-600">{selectedPlaceDetail.tips}</p></div>}
+              {selectedPlaceDetail.tips && <div className="bg-amber-50 p-4 rounded-xl mb-4"><p className="text-xs font-bold text-amber-700 mb-1">💡 Traveler Tips</p><p className="text-sm text-gray-600">{localizePlace(lang, selectedPlaceDetail).tips}</p></div>}
               {selectedPlaceDetail._coords && (
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-2">
@@ -1335,7 +1383,7 @@ export default function AITripPlanner() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline"
-                    >Open in Google Maps <ExternalLink size={11} /></a>
+> {t('dest.open-maps')} <ExternalLink size={11} /></a>
                   </div>
                   <GoogleMapView
                     places={[{ name: selectedPlaceDetail.name, district: selectedPlaceDetail._district, lat: selectedPlaceDetail._coords.lat, lng: selectedPlaceDetail._coords.lng }]}
@@ -1345,8 +1393,8 @@ export default function AITripPlanner() {
                 </div>
               )}
               <div className="flex gap-3">
-                <button onClick={() => { setSelectedPlaceDetail(null); setShowTripPlanner(true); }} className="flex-1 bg-gradient-to-r from-orange-500 to-red-600 text-white px-5 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 text-sm"><Sparkles size={16} />Plan Trip Here</button>
-                <button onClick={() => setSelectedPlaceDetail(null)} className="flex-1 border-2 border-gray-200 text-gray-700 px-5 py-3 rounded-xl font-semibold text-sm">Close</button>
+                <button onClick={() => { setSelectedPlaceDetail(null); setShowTripPlanner(true); }} className="flex-1 bg-gradient-to-r from-orange-500 to-red-600 text-white px-5 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 text-sm"><Sparkles size={16} />{t('place.plan-here')}</button>
+                <button onClick={() => setSelectedPlaceDetail(null)} className="flex-1 border-2 border-gray-200 text-gray-700 px-5 py-3 rounded-xl font-semibold text-sm">{t('place.close')}</button>
               </div>
             </div>
           </div>
@@ -1361,43 +1409,43 @@ export default function AITripPlanner() {
             {planningStep === 1 && (
               <div className="p-8 fade-in">
                 <div className="flex justify-between items-center mb-6">
-                  <div><h2 className="text-3xl font-bold gradient-text mb-1">Where do you start?</h2><p className="text-gray-600">Pick your starting district — we'll build your route outward from there</p></div>
+                  <div><h2 className="text-3xl font-bold gradient-text mb-1">{t('planner.step1.title')}</h2><p className="text-gray-600">{t('planner.step1.sub')}</p></div>
                   <button onClick={() => { setShowTripPlanner(false); setPlanningStep(1); }} className="p-2 hover:bg-gray-100 rounded-full"><X size={24} /></button>
                 </div>
                 <div className="mb-6">
-                  <div className="flex justify-between text-sm mb-1"><span className="text-orange-600 font-medium">Step 1 of 3</span><span className="text-gray-500">Starting Location</span></div>
+                  <div className="flex justify-between text-sm mb-1"><span className="text-orange-600 font-medium">{t('planner.step1.step')}</span><span className="text-gray-500">{t('planner.step1.label')}</span></div>
                   <div className="h-2 bg-gray-200 rounded-full"><div className="h-full bg-gradient-to-r from-orange-500 to-red-600 rounded-full" style={{ width: '33%' }} /></div>
                 </div>
                 <div className="relative mb-4">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                  <input type="text" value={districtSearch} onChange={e => setDistrictSearch(e.target.value)} placeholder="Search district name…" className="w-full pl-11 pr-4 py-3 rounded-xl border-2 border-gray-200 focus:border-orange-400 focus:outline-none text-sm" />
+                  <input type="text" value={districtSearch} onChange={e => setDistrictSearch(e.target.value)} placeholder={t('planner.step1.search')} className="w-full pl-11 pr-4 py-3 rounded-xl border-2 border-gray-200 focus:border-orange-400 focus:outline-none text-sm" />
                   {districtSearch && <button onClick={() => setDistrictSearch('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"><X size={16} /></button>}
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-96 overflow-y-auto pr-1 mb-6">
-                  {districts.filter(d => d.name.toLowerCase().includes(districtSearch.toLowerCase())).map(d => (
+                  {districts.filter(d => d.name.toLowerCase().includes(districtSearch.toLowerCase()) || localizeDistrict(lang, d).name.toLowerCase().includes(districtSearch.toLowerCase())).map(d => { const dl = localizeDistrict(lang, d); return (
                     <button key={d.name} onClick={() => setStartingDistrict(d.name)}
                       className={`relative rounded-xl overflow-hidden text-left transition-all ${startingDistrict === d.name ? 'ring-4 ring-orange-400 ring-offset-2' : 'border-2 border-gray-200 hover:border-orange-300'}`}>
                       <div className="relative h-20 overflow-hidden">
-                        <img src={d.image} alt={d.name} className="w-full h-full object-cover" onError={e => { e.target.src = DISTRICT_FALLBACKS[d.name] || FALLBACK; }} />
+                        <img src={d.image} alt={dl.name} className="w-full h-full object-cover" onError={e => { e.target.src = DISTRICT_FALLBACKS[d.name] || FALLBACK; }} />
                         <div className={`absolute inset-0 ${startingDistrict === d.name ? 'bg-orange-500/40' : 'bg-black/30'}`} />
                         {startingDistrict === d.name && <div className="absolute top-2 right-2 bg-white rounded-full p-0.5"><Check className="text-orange-500" size={14} /></div>}
                       </div>
                       <div className="px-2.5 py-2 bg-white">
-                        <p className={`font-bold text-sm truncate ${startingDistrict === d.name ? 'text-orange-600' : 'text-gray-800'}`}>{d.name}</p>
-                        <p className="text-xs text-gray-400 truncate">{d.highlights}</p>
+                        <p className={`font-bold text-sm truncate ${startingDistrict === d.name ? 'text-orange-600' : 'text-gray-800'}`}>{dl.name}</p>
+                        <p className="text-xs text-gray-400 truncate">{dl.highlights}</p>
                       </div>
                     </button>
-                  ))}
+                  ); })}
                 </div>
                 {startingDistrict && (
                   <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 mb-5 flex items-center gap-3">
                     <MapPin className="text-orange-500 flex-shrink-0" size={20} />
-                    <div><p className="font-bold text-orange-700 text-sm">Starting from: {startingDistrict}</p><p className="text-xs text-orange-600">{districts.find(d => d.name === startingDistrict)?.desc}</p></div>
+                    <div><p className="font-bold text-orange-700 text-sm">{t('planner.step1.starting-from')}: {localizeDistrict(lang, districts.find(d => d.name === startingDistrict))?.name}</p><p className="text-xs text-orange-600">{localizeDistrict(lang, districts.find(d => d.name === startingDistrict))?.desc}</p></div>
                   </div>
                 )}
                 <div className="flex justify-end gap-3">
-                  <button onClick={() => { setShowTripPlanner(false); setPlanningStep(1); }} className="px-6 py-3 border-2 border-gray-300 rounded-full font-semibold">Cancel</button>
-                  <button onClick={() => setPlanningStep(2)} disabled={!startingDistrict} className="px-8 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full font-semibold hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">Continue <ArrowRight size={20} /></button>
+                  <button onClick={() => { setShowTripPlanner(false); setPlanningStep(1); }} className="px-6 py-3 border-2 border-gray-300 rounded-full font-semibold">{t('common.cancel')}</button>
+                  <button onClick={() => setPlanningStep(2)} disabled={!startingDistrict} className="px-8 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full font-semibold hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">{t('common.continue')} <ArrowRight size={20} /></button>
                 </div>
               </div>
             )}
@@ -1405,15 +1453,15 @@ export default function AITripPlanner() {
             {planningStep === 2 && (
               <div className="p-8 fade-in">
                 <div className="flex justify-between items-center mb-6">
-                  <div><h2 className="text-3xl font-bold gradient-text mb-1">Your Preferences</h2><p className="text-gray-600">Tell us what you love — we'll score and rank every place for you</p></div>
+                  <div><h2 className="text-3xl font-bold gradient-text mb-1">{t('planner.step2.title')}</h2><p className="text-gray-600">{t('planner.step2.sub')}</p></div>
                   <button onClick={() => { setShowTripPlanner(false); setPlanningStep(1); }} className="p-2 hover:bg-gray-100 rounded-full"><X size={24} /></button>
                 </div>
                 <div className="mb-6">
-                  <div className="flex justify-between text-sm mb-1"><span className="text-orange-600 font-medium">Step 2 of 3</span><span className="text-gray-500">Preferences</span></div>
+                  <div className="flex justify-between text-sm mb-1"><span className="text-orange-600 font-medium">{t('planner.step2.step')}</span><span className="text-gray-500">{t('planner.step2.label')}</span></div>
                   <div className="h-2 bg-gray-200 rounded-full"><div className="h-full bg-gradient-to-r from-orange-500 to-red-600 rounded-full" style={{ width: '66%' }} /></div>
                 </div>
                 <div className="mb-7">
-                  <h3 className="text-lg font-bold mb-3 flex items-center gap-2"><Heart className="text-orange-500" size={20} />What interests you?</h3>
+                  <h3 className="text-lg font-bold mb-3 flex items-center gap-2"><Heart className="text-orange-500" size={20} />{t('planner.step2.interests')}</h3>
                   <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
                     {interestOptions.map(o => {
                       const Icon = o.icon;
@@ -1427,45 +1475,45 @@ export default function AITripPlanner() {
                             {specialBadge ? <span className="text-xl">{specialBadge}</span> : <Icon className={iconColors[o.color]} size={22} />}
                             {selected && <Check className={iconColors[o.color]} size={15} />}
                           </div>
-                          <span className="font-semibold text-sm text-gray-700">{o.label}</span>
+                          <span className="font-semibold text-sm text-gray-700">{t(`planner.step2.interest-${o.id}`)}</span>
                         </button>
                       );
                     })}
                   </div>
                 </div>
                 <div className="mb-7">
-                  <h3 className="text-lg font-bold mb-3 flex items-center gap-2"><TrendingUp className="text-orange-500" size={20} />Travel pace?</h3>
+                  <h3 className="text-lg font-bold mb-3 flex items-center gap-2"><TrendingUp className="text-orange-500" size={20} />{t('planner.step2.pace')}</h3>
                   <div className="grid md:grid-cols-3 gap-3">
                     {paceOptions.map(o => (
                       <button key={o.id} onClick={() => setTripPreferences(p => ({ ...p, pace: o.id }))} className={`p-4 rounded-xl border-2 transition-all ${tripPreferences.pace === o.id ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-300'}`}>
-                        <p className="font-bold text-lg">{o.label}</p><p className="text-sm text-gray-600 mt-1">{o.desc}</p>
+                        <p className="font-bold text-lg">{t(`planner.step2.pace-${o.id}`)}</p><p className="text-sm text-gray-600 mt-1">{t(`planner.step2.pace-${o.id}-d`)}</p>
                       </button>
                     ))}
                   </div>
                 </div>
                 <div className="mb-7">
-                  <h3 className="text-lg font-bold mb-3 flex items-center gap-2"><Wallet className="text-orange-500" size={20} />Budget?</h3>
+                  <h3 className="text-lg font-bold mb-3 flex items-center gap-2"><Wallet className="text-orange-500" size={20} />{t('planner.step2.budget')}</h3>
                   <div className="grid md:grid-cols-3 gap-3">
                     {budgetOptions.map(o => (
                       <button key={o.id} onClick={() => setTripPreferences(p => ({ ...p, budget: o.id }))} className={`p-4 rounded-xl border-2 transition-all ${tripPreferences.budget === o.id ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-300'}`}>
-                        <div className="text-2xl mb-1">{o.icon}</div><p className="font-bold">{o.label}</p><p className="text-sm text-gray-600">{o.desc}</p>
+                        <div className="text-2xl mb-1">{o.icon}</div><p className="font-bold">{t(`planner.step2.budget-${o.id}`)}</p><p className="text-sm text-gray-600">{t(`planner.step2.budget-${o.id}-d`)}</p>
                       </button>
                     ))}
                   </div>
                 </div>
                 <div className="mb-7">
-                  <h3 className="text-lg font-bold mb-3 flex items-center gap-2"><Users className="text-orange-500" size={20} />Who's travelling?</h3>
+                  <h3 className="text-lg font-bold mb-3 flex items-center gap-2"><Users className="text-orange-500" size={20} />{t('planner.step2.group')}</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {groupOptions.map(o => (
                       <button key={o.id} onClick={() => setTripPreferences(p => ({ ...p, groupType: o.id }))} className={`p-4 rounded-xl border-2 transition-all ${tripPreferences.groupType === o.id ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-300'}`}>
-                        <div className="text-2xl mb-1">{o.icon}</div><p className="font-semibold text-sm">{o.label}</p>
+                        <div className="text-2xl mb-1">{o.icon}</div><p className="font-semibold text-sm">{t(`planner.step2.group-${o.id}`)}</p>
                       </button>
                     ))}
                   </div>
                 </div>
                 <div className="flex justify-between gap-3">
-                  <button onClick={() => setPlanningStep(1)} className="px-6 py-3 border-2 border-gray-300 rounded-full font-semibold flex items-center gap-2"><ChevronLeft size={20} />Back</button>
-                  <button onClick={() => setPlanningStep(3)} disabled={!tripPreferences.interests.length || !tripPreferences.pace || !tripPreferences.budget || !tripPreferences.groupType} className="px-8 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full font-semibold hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">Continue <ArrowRight size={20} /></button>
+                  <button onClick={() => setPlanningStep(1)} className="px-6 py-3 border-2 border-gray-300 rounded-full font-semibold flex items-center gap-2"><ChevronLeft size={20} />{t('common.back')}</button>
+                  <button onClick={() => setPlanningStep(3)} disabled={!tripPreferences.interests.length || !tripPreferences.pace || !tripPreferences.budget || !tripPreferences.groupType} className="px-8 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full font-semibold hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">{t('common.continue')} <ArrowRight size={20} /></button>
                 </div>
               </div>
             )}
@@ -1473,41 +1521,41 @@ export default function AITripPlanner() {
             {planningStep === 3 && (
               <div className="p-8 fade-in">
                 <div className="flex justify-between items-center mb-6">
-                  <div><h2 className="text-3xl font-bold gradient-text mb-1">How many days?</h2><p className="text-gray-600">We'll plan your full journey — starting in {startingDistrict} and expanding outward</p></div>
+                  <div><h2 className="text-3xl font-bold gradient-text mb-1">{t('planner.step3.title')}</h2><p className="text-gray-600">{t('planner.step3.sub', { from: localizeDistrict(lang, { name: startingDistrict }).name })}</p></div>
                   <button onClick={() => { setShowTripPlanner(false); setPlanningStep(1); }} className="p-2 hover:bg-gray-100 rounded-full"><X size={24} /></button>
                 </div>
                 <div className="mb-6">
-                  <div className="flex justify-between text-sm mb-1"><span className="text-orange-600 font-medium">Step 3 of 3</span><span className="text-gray-500">Duration</span></div>
+                  <div className="flex justify-between text-sm mb-1"><span className="text-orange-600 font-medium">{t('planner.step3.step')}</span><span className="text-gray-500">{t('planner.step3.label')}</span></div>
                   <div className="h-2 bg-gray-200 rounded-full"><div className="h-full bg-gradient-to-r from-orange-500 to-red-600 rounded-full" style={{ width: '100%' }} /></div>
                 </div>
                 <div className="flex items-center justify-center mb-6">
                   <button onClick={() => setTripDuration(Math.max(1, tripDuration - 1))} className="p-4 bg-gray-100 rounded-full hover:bg-gray-200 transition-all"><ChevronLeft size={24} /></button>
                   <div className="mx-12 text-center">
                     <div className="text-7xl font-bold gradient-text mb-2">{tripDuration}</div>
-                    <div className="text-xl text-gray-600">Day{tripDuration > 1 ? 's' : ''}</div>
+                    <div className="text-xl text-gray-600">{t(tripDuration > 1 ? 'planner.step3.days' : 'common.day-one')}</div>
                   </div>
                   <button onClick={() => setTripDuration(Math.min(14, tripDuration + 1))} className="p-4 bg-gray-100 rounded-full hover:bg-gray-200 transition-all"><ChevronRight size={24} /></button>
                 </div>
                 <div className="flex justify-center gap-3 flex-wrap mb-6">
                   {[3, 5, 7, 10].map(d => (
-                    <button key={d} onClick={() => setTripDuration(d)} className={`px-6 py-2 rounded-full font-semibold transition-all ${tripDuration === d ? 'bg-gradient-to-r from-orange-500 to-red-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}>{d} Days</button>
+                    <button key={d} onClick={() => setTripDuration(d)} className={`px-6 py-2 rounded-full font-semibold transition-all ${tripDuration === d ? 'bg-gradient-to-r from-orange-500 to-red-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}>{d} {t('planner.step3.days')}</button>
                   ))}
                 </div>
                 <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 p-5 rounded-2xl mb-6">
-                  <p className="font-bold text-orange-800 mb-3 flex items-center gap-2"><Navigation size={18} className="text-orange-500" />How your route expands from {startingDistrict}</p>
+                  <p className="font-bold text-orange-800 mb-3 flex items-center gap-2"><Navigation size={18} className="text-orange-500" />{t('planner.step3.expand')} {localizeDistrict(lang, { name: startingDistrict }).name}</p>
                   <div className="space-y-2">
-                    {[{ label: 'Day 1', desc: `Explore places in and around ${startingDistrict}`, icon: '📍' }, { label: 'Days 2–3', desc: 'Expand to nearest neighbouring districts', icon: '🔄' }, { label: `Days 4–${tripDuration}`, desc: 'Continue outward — each day moves to the next closest region', icon: '🗺️' }].map((r, i) => (
+                    {[{ label: t('planner.day1'), desc: t('planner.d1-desc', { district: localizeDistrict(lang, { name: startingDistrict }).name }), icon: '📍' }, { label: t('planner.days2to3'), desc: t('planner.d2-desc'), icon: '🔄' }, { label: t('planner.days4', { n: tripDuration }), desc: t('planner.d3-desc'), icon: '🗺️' }].map((r, i) => (
                       <div key={i} className="flex items-start gap-3 bg-white/70 rounded-lg px-3 py-2">
                         <span className="text-lg">{r.icon}</span>
                         <div><span className="font-bold text-orange-700 text-sm">{r.label}: </span><span className="text-sm text-gray-600">{r.desc}</span></div>
                       </div>
                     ))}
                   </div>
-                  <p className="text-xs text-orange-600 mt-3 italic">💡 With {tripPreferences.pace} pace ({SLOTS_PER_DAY[tripPreferences.pace]} places/day), {tripDuration} days = up to {tripDuration * SLOTS_PER_DAY[tripPreferences.pace]} places from {totalPlaces}+ available</p>
+                  <p className="text-xs text-orange-600 mt-3 italic">💡 {t('planner.step3.hint', { pace: t(`planner.step2.pace-${tripPreferences.pace}`), slots: SLOTS_PER_DAY[tripPreferences.pace], days: tripDuration, total: tripDuration * SLOTS_PER_DAY[tripPreferences.pace], available: totalPlaces })}</p>
                 </div>
                 <div className="flex justify-between gap-3">
-                  <button onClick={() => setPlanningStep(2)} className="px-6 py-3 border-2 border-gray-300 rounded-full font-semibold flex items-center gap-2"><ChevronLeft size={20} />Back</button>
-                  <button onClick={generateTripRecommendations} className="px-8 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full font-semibold hover:shadow-lg flex items-center gap-2"><Sparkles size={20} />Generate My Itinerary</button>
+                  <button onClick={() => setPlanningStep(2)} className="px-6 py-3 border-2 border-gray-300 rounded-full font-semibold flex items-center gap-2"><ChevronLeft size={20} />{t('common.back')}</button>
+                  <button onClick={generateTripRecommendations} className="px-8 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full font-semibold hover:shadow-lg flex items-center gap-2"><Sparkles size={20} />{t('planner.step3.generate')}</button>
                 </div>
               </div>
             )}
@@ -1516,13 +1564,13 @@ export default function AITripPlanner() {
               <div className="p-8 fade-in">
                 <div className="flex flex-col items-center justify-center py-16">
                   <div className="analyzing-pulse mb-6"><Sparkles className="text-orange-500" size={64} /></div>
-                  <h2 className="text-3xl font-bold gradient-text mb-4">Building Your Route</h2>
-                  <p className="text-gray-600 text-center max-w-md mb-6">Starting in <strong>{startingDistrict}</strong> and expanding outward across Chhattisgarh…</p>
+                  <h2 className="text-3xl font-bold gradient-text mb-4">{t('planner.step4.title')}</h2>
+                  <p className="text-gray-600 text-center max-w-md mb-6">{t('planner.step4.sub', { from: localizeDistrict(lang, { name: startingDistrict }).name })}</p>
                   <div className="flex flex-col gap-2.5 text-sm text-gray-500 mb-8 w-full max-w-sm">
-                    <div className="flex items-center gap-2 bg-green-50 rounded-lg px-4 py-2.5 border border-green-100"><Check className="text-green-500 flex-shrink-0" size={16} /><span>Anchoring route to {startingDistrict}</span></div>
-                    <div className="flex items-center gap-2 bg-green-50 rounded-lg px-4 py-2.5 border border-green-100"><Check className="text-green-500 flex-shrink-0" size={16} /><span>Scoring {totalPlaces}+ places by your interests</span></div>
-                    <div className="flex items-center gap-2 bg-orange-50 rounded-lg px-4 py-2.5 border border-orange-100 analyzing-pulse"><Sparkles size={16} className="text-orange-400 flex-shrink-0" /><span>Grouping nearby places into each day…</span></div>
-                    <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-100 opacity-50"><Navigation size={16} className="text-gray-400 flex-shrink-0" /><span>Calculating inter-district travel times</span></div>
+                    <div className="flex items-center gap-2 bg-green-50 rounded-lg px-4 py-2.5 border border-green-100"><Check className="text-green-500 flex-shrink-0" size={16} /><span>{t('planner.step4.anchoring', { from: localizeDistrict(lang, { name: startingDistrict }).name })}</span></div>
+                    <div className="flex items-center gap-2 bg-green-50 rounded-lg px-4 py-2.5 border border-green-100"><Check className="text-green-500 flex-shrink-0" size={16} /><span>{t('planner.step4.scoring', { total: totalPlaces })}</span></div>
+                    <div className="flex items-center gap-2 bg-orange-50 rounded-lg px-4 py-2.5 border border-orange-100 analyzing-pulse"><Sparkles size={16} className="text-orange-400 flex-shrink-0" /><span>{t('planner.step5.analyzing1')}</span></div>
+                    <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-100 opacity-50"><Navigation size={16} className="text-gray-400 flex-shrink-0" /><span>{t('planner.step5.analyzing2')}</span></div>
                   </div>
                   <div className="w-64 h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-orange-500 to-red-600 animate-pulse rounded-full" style={{ width: '65%' }} /></div>
                 </div>
@@ -1533,56 +1581,56 @@ export default function AITripPlanner() {
               <div className="p-8 fade-in">
                 <div className="flex justify-between items-center mb-6">
                   <div>
-                    <h2 className="text-3xl font-bold gradient-text mb-1">Your Personalised Itinerary</h2>
+                    <h2 className="text-3xl font-bold gradient-text mb-1">{t('planner.step5.title')}</h2>
                     <div className="flex items-center gap-2 flex-wrap mt-1">
-                      <span className="inline-flex items-center gap-1.5 bg-orange-100 text-orange-700 text-xs font-bold px-3 py-1 rounded-full"><MapPin size={12} />Starting: {startingDistrict}</span>
-                      <span className="inline-flex items-center gap-1.5 bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-full"><Calendar size={12} />{tripDuration} Days</span>
-                      <span className="inline-flex items-center gap-1.5 bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full"><Navigation size={12} />{new Set(tripRecommendations.itinerary.flatMap(d => d.uniqueDistricts)).size} Districts</span>
+                      <span className="inline-flex items-center gap-1.5 bg-orange-100 text-orange-700 text-xs font-bold px-3 py-1 rounded-full"><MapPin size={12} />{t('planner.step5.starting')}: {localizeDistrict(lang, { name: startingDistrict }).name}</span>
+                      <span className="inline-flex items-center gap-1.5 bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-full"><Calendar size={12} />{t('common.day', { count: tripDuration })}</span>
+                      <span className="inline-flex items-center gap-1.5 bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full"><Navigation size={12} />{t('common.districts-count', { count: new Set(tripRecommendations.itinerary.flatMap(d => d.uniqueDistricts)).size })}</span>
                     </div>
                   </div>
                   <button onClick={() => { setShowTripPlanner(false); setPlanningStep(1); }} className="p-2 hover:bg-gray-100 rounded-full"><X size={24} /></button>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap mb-5 p-3 bg-gray-50 rounded-xl border border-gray-200 text-xs">
-                  <span className="font-bold text-gray-500 uppercase tracking-wide">Distance:</span>
+                  <span className="font-bold text-gray-500 uppercase tracking-wide">{t('planner.step5.distance')}</span>
                   {[{ bg: '#f0fdf4', text: '#166534', border: '#bbf7d0', label: '≤ 25 km' }, { bg: '#fffbeb', text: '#92400e', border: '#fde68a', label: '26–60 km' }, { bg: '#fef2f2', text: '#991b1b', border: '#fecaca', label: '> 60 km' }].map(c => (
                     <span key={c.label} className="flex items-center gap-1 px-2.5 py-1 rounded-full font-semibold border" style={{ background: c.bg, color: c.text, borderColor: c.border }}><Navigation size={9} />{c.label}</span>
                   ))}
                 </div>
                 <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-5 rounded-2xl mb-6">
-                  <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><Wallet className="text-green-600" size={22} />Estimated Cost</h3>
+                  <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><Wallet className="text-green-600" size={22} />{t('planner.step5.cost')}</h3>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <p className="text-3xl font-bold text-green-600 mb-1">₹{tripRecommendations.estimatedCost.total.toLocaleString()}</p>
-                      <p className="text-sm text-gray-600">Total for {tripDuration} day{tripDuration > 1 ? 's' : ''} · {tripPreferences.groupType} ({tripRecommendations.estimatedCost.groupSize} {tripRecommendations.estimatedCost.groupSize === 1 ? 'person' : 'people'})</p>
+                      <p className="text-sm text-gray-600">{t('planner.step5.total-for', { n: tripDuration })} · {t(`planner.step2.group-${tripPreferences.groupType}`)} ({t(tripRecommendations.estimatedCost.groupSize === 1 ? 'common.person' : 'common.people', { count: tripRecommendations.estimatedCost.groupSize })})</p>
                       <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                        <span className="bg-white px-2.5 py-1 rounded-full text-green-700 font-semibold border border-green-200">₹{tripRecommendations.estimatedCost.perDay.toLocaleString()}/day total</span>
-                        <span className="bg-white px-2.5 py-1 rounded-full text-green-700 font-semibold border border-green-200">₹{tripRecommendations.estimatedCost.perPersonPerDay.toLocaleString()}/person/day</span>
+                        <span className="bg-white px-2.5 py-1 rounded-full text-green-700 font-semibold border border-green-200">₹{tripRecommendations.estimatedCost.perDay.toLocaleString()}{t('planner.step5.per-day-total')}</span>
+                        <span className="bg-white px-2.5 py-1 rounded-full text-green-700 font-semibold border border-green-200">₹{tripRecommendations.estimatedCost.perPersonPerDay.toLocaleString()}{t('planner.step5.per-person-day')}</span>
                       </div>
                     </div>
                     <div className="space-y-1.5">
-                      {Object.entries(tripRecommendations.estimatedCost.breakdown).map(([k, v]) => (<div key={k} className="flex justify-between text-sm"><span className="text-gray-600 capitalize">{k}</span><span className="font-semibold">₹{v.toLocaleString()}</span></div>))}
-                      <div className="flex justify-between text-xs text-gray-500 pt-1"><span>Travel distance</span><span className="font-semibold">~{tripRecommendations.estimatedCost.totalTransportKm.toLocaleString()} km</span></div>
+                      {Object.entries(tripRecommendations.estimatedCost.breakdown).map(([k, v]) => (<div key={k} className="flex justify-between text-sm"><span className="text-gray-600 capitalize">{t(`planner.step5.${k === 'entryFees' ? 'entry-fees' : k}`)}</span><span className="font-semibold">₹{v.toLocaleString()}</span></div>))}
+                      <div className="flex justify-between text-xs text-gray-500 pt-1"><span>{t('planner.step5.travel-distance')}</span><span className="font-semibold">~{tripRecommendations.estimatedCost.totalTransportKm.toLocaleString()} km</span></div>
                     </div>
                   </div>
                 </div>
                 <div className="bg-gradient-to-br from-purple-50 to-fuchsia-50 p-5 rounded-2xl mb-6">
-                  <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><Sparkles className="text-purple-600" size={20} />CG Voyager Recommender · More Places You'll Love</h3>
-                  <p className="text-xs text-gray-500 mb-3">Personalised picks from {buildPlacePool(districts).length} places — scored by your interests (65%) + traveller ratings (35%).</p>
+                  <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><Sparkles className="text-purple-600" size={20} />CG Voyager Recommender · {t('planner.step5.recommender-title')}</h3>
+                  <p className="text-xs text-gray-500 mb-3">{t('planner.step5.recommender-desc')}</p>
                   {!tripRecommendations.personalizedPicks || tripRecommendations.personalizedPicks.length === 0 ? (
-                    <p className="text-sm text-gray-500">No additional recommendations found.</p>
+                    <p className="text-sm text-gray-500">{t('planner.step5.no-recs')}</p>
                   ) : (
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {tripRecommendations.personalizedPicks.map(p => (
                         <div key={p.name} className="bg-white p-3 rounded-xl border border-purple-100">
                           <div className="flex justify-between items-start gap-2">
-                            <p className="text-sm font-bold text-purple-900">{p.name}</p>
+                            <p className="text-sm font-bold text-purple-900">{localizePlaceName(lang, p)}</p>
                             <span className="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full flex-shrink-0">{p.score}</span>
                           </div>
-                          <p className="text-xs text-gray-500 mt-0.5">{p.district} · {p.type}</p>
-                          <p className="text-xs text-purple-700 mt-1.5 italic">{p.reason}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{localizeDistrict(lang, { name: p.district }).name} · {p.type}</p>
+                          <p className="text-xs text-purple-700 mt-1.5 italic">{p.reasons ? p.reasons.map(rk => rk === 'pick.reason.in' ? t(rk, { district: localizeDistrict(lang, { name: p.district }).name }) : t(rk)).join(' / ') : p.reason}</p>
                           <div className="flex items-center justify-between text-xs mt-2 text-gray-600">
                             <span>★ {p.rating}</span>
-                            <span>{p.entryFee || 'Free'}</span>
+                            <span>{p.entryFee || t('common.free')}</span>
                           </div>
                         </div>
                       ))}
@@ -1590,12 +1638,12 @@ export default function AITripPlanner() {
                   )}
                 </div>
                 <div className="mb-6">
-                  <h3 className="font-bold text-xl mb-1 flex items-center gap-2"><Map className="text-red-500" size={22} />Trip Route Map</h3>
-                  <p className="text-sm text-gray-500 mb-3">Your {tripDuration}-day journey across {new Set(tripRecommendations.itinerary.flatMap(d => d.uniqueDistricts)).size} districts — click markers for place details.</p>
+                  <h3 className="font-bold text-xl mb-1 flex items-center gap-2"><Map className="text-red-500" size={22} />{t('planner.step5.route-map')}</h3>
+                  <p className="text-sm text-gray-500 mb-3">{t('planner.step5.route-map-sub', { d: new Set(tripRecommendations.itinerary.flatMap(d => d.uniqueDistricts)).size })}</p>
                   <GoogleMapView
                     places={tripRecommendations.itinerary.flatMap(day => day.activities.map(a => {
                       const dist = districts.find(d => d.name === a.districtName);
-                      return { name: a.title, district: a.districtName, lat: dist?.coordinates?.lat, lng: dist?.coordinates?.lng, info: `Day ${day.day}` };
+                      return { name: localizePlaceName(lang, { name: a.title }), district: a.districtName, lat: dist?.coordinates?.lat, lng: dist?.coordinates?.lng, info: `Day ${day.day}` };
                     })).filter(p => typeof p.lat === 'number' && typeof p.lng === 'number')}
                     polyline
                     height="320px"
@@ -1603,28 +1651,28 @@ export default function AITripPlanner() {
                   />
                 </div>
                 <div className="mb-6">
-                  <h3 className="font-bold text-xl mb-1 flex items-center gap-2"><Navigation className="text-orange-500" size={22} />Day-by-Day Route</h3>
-                  <p className="text-sm text-gray-500 mb-4">Starts in <strong>{startingDistrict}</strong> · expands to nearest districts each day</p>
+                  <h3 className="font-bold text-xl mb-1 flex items-center gap-2"><Navigation className="text-orange-500" size={22} />{t('planner.step5.day-route')}</h3>
+                  <p className="text-sm text-gray-500 mb-4">{t('planner.step5.route-starts', { from: localizeDistrict(lang, { name: startingDistrict }).name })}</p>
                   <div className="space-y-4">{tripRecommendations.itinerary.map(day => (<DayCard key={day.day} day={day} />))}</div>
                 </div>
                 <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 rounded-2xl mb-6">
-                  <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><Sparkles className="text-blue-600" size={20} />Route Insights</h3>
-                  <div className="space-y-2">{tripRecommendations.insights.map((ins, i) => (<div key={i} className="flex gap-3 items-start"><Check className="text-blue-600 mt-0.5 flex-shrink-0" size={18} /><p className="text-sm text-gray-700">{ins}</p></div>))}</div>
+                  <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><Sparkles className="text-blue-600" size={20} />{t('planner.step5.insights')}</h3>
+                  <div className="space-y-2">{tripRecommendations.insights.map((ins, i) => (<div key={i} className="flex gap-3 items-start"><Check className="text-blue-600 mt-0.5 flex-shrink-0" size={18} /><p className="text-sm text-gray-700">{renderInsight(ins)}</p></div>))}</div>
                 </div>
                 <div className="bg-amber-50 p-5 rounded-2xl mb-6">
-                  <h3 className="font-bold text-lg mb-3">💡 Travel Tips</h3>
-                  <div className="space-y-2">{tripRecommendations.recommendations.map((r, i) => (<div key={i} className="flex gap-3 items-start bg-white p-3 rounded-lg"><span className="text-lg flex-shrink-0">{r.icon || '✅'}</span><div><p className="text-sm font-semibold">{r.title}</p><p className="text-xs text-gray-500">{r.reason}</p></div></div>))}</div>
+                  <h3 className="font-bold text-lg mb-3">{t('planner.step5.tips-title')}</h3>
+                  <div className="space-y-2">{tripRecommendations.recommendations.map((r, i) => (<div key={i} className="flex gap-3 items-start bg-white p-3 rounded-lg"><span className="text-lg flex-shrink-0">{r.icon || '✅'}</span><div><p className="text-sm font-semibold">{r.k ? t(`planner.rec-${r.k}.title`) : r.title}</p><p className="text-xs text-gray-500">{r.k ? t(`planner.rec-${r.k}.reason`) : r.reason}</p></div></div>))}</div>
                 </div>
                 {tripRecommendations.responsibleTips?.length > 0 && (
                   <div className="bg-gradient-to-r from-teal-600 to-green-700 p-5 rounded-2xl mb-6 text-white">
-                    <h3 className="font-bold text-lg mb-3">🌱 Responsible Tourism Reminders</h3>
-                    <div className="space-y-2">{tripRecommendations.responsibleTips.map((r, i) => (<div key={i} className="flex gap-3 items-start bg-white/10 rounded-xl px-3 py-2.5"><span className="text-lg flex-shrink-0">{r.icon}</span><p className="text-sm text-teal-50">{r.tip}</p></div>))}</div>
+                    <h3 className="font-bold text-lg mb-3">{t('planner.step5.responsible')}</h3>
+                    <div className="space-y-2">{tripRecommendations.responsibleTips.map((r, i) => (<div key={i} className="flex gap-3 items-start bg-white/10 rounded-xl px-3 py-2.5"><span className="text-lg flex-shrink-0">{r.icon}</span><p className="text-sm text-teal-50">{r.k ? t(`planner.${r.k}`) : r.tip}</p></div>))}</div>
                   </div>
                 )}
                 <div className="flex gap-4 justify-center flex-wrap">
-                  <button onClick={() => setSaveModalOpen(true)} className="px-8 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full font-semibold hover:shadow-lg flex items-center gap-2"><Save size={20} />Save Itinerary</button>
-                  <button onClick={() => setSaveModalOpen(true)} className="px-8 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full font-semibold hover:shadow-lg flex items-center gap-2"><Share2 size={20} />Share Trip</button>
-                  <button onClick={() => { setPlanningStep(1); setStartingDistrict(''); setDistrictSearch(''); setTripPreferences({ interests: [], pace: '', budget: '', groupType: '' }); setTripDuration(3); districtColorIndexRef.current = {}; districtColorCounterRef.current = 0; }} className="px-8 py-3 border-2 border-gray-300 rounded-full font-semibold hover:bg-gray-50">Plan Another</button>
+                  <button onClick={() => setSaveModalOpen(true)} className="px-8 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full font-semibold hover:shadow-lg flex items-center gap-2"><Save size={20} />{t('planner.step5.save-itinerary')}</button>
+                  <button onClick={() => setSaveModalOpen(true)} className="px-8 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full font-semibold hover:shadow-lg flex items-center gap-2"><Share2 size={20} />{t('planner.step5.share-trip')}</button>
+                  <button onClick={() => { setPlanningStep(1); setStartingDistrict(''); setDistrictSearch(''); setTripPreferences({ interests: [], pace: '', budget: '', groupType: '' }); setTripDuration(3); districtColorIndexRef.current = {}; districtColorCounterRef.current = 0; }} className="px-8 py-3 border-2 border-gray-300 rounded-full font-semibold hover:bg-gray-50">{t('planner.step5.plan-another')}</button>
                 </div>
               </div>
             )}
@@ -1638,19 +1686,19 @@ export default function AITripPlanner() {
         <div className="max-w-7xl mx-auto px-4">
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
-              <div className="flex items-center space-x-2 mb-4"><div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center"><MapPin size={24} /></div><span className="font-bold text-xl">Incredible Chhattisgarh</span></div>
-              <p className="text-gray-400 text-sm">Smart geo-optimised trip planning for all 33 districts. {totalPlaces}+ tourist places mapped.</p>
-              <p className="text-gray-500 text-xs mt-2">Photos: © CTB & Wikimedia Commons</p>
+              <div className="flex items-center space-x-2 mb-4"><div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center"><MapPin size={24} /></div><span className="font-bold text-xl">{t('brand')}</span></div>
+              <p className="text-gray-400 text-sm">{t('footer.desc', { total: totalPlaces })}</p>
+              <p className="text-gray-500 text-xs mt-2">{t('footer.photos')}</p>
             </div>
-            <div><h4 className="font-bold mb-4">Quick Links</h4><ul className="space-y-2">{['Destinations', 'Trip Planner', 'Contact'].map(l => <li key={l}><a href="#" className="text-gray-400 hover:text-orange-500 text-sm">{l}</a></li>)}</ul></div>
-            <div><h4 className="font-bold mb-4">Support</h4><ul className="space-y-2">{['Help Center', 'FAQs', 'Privacy'].map(l => <li key={l}><a href="#" className="text-gray-400 hover:text-orange-500 text-sm">{l}</a></li>)}</ul></div>
+            <div><h4 className="font-bold mb-4">{t('footer.quick')}</h4><ul className="space-y-2">{['footer.destinations', 'footer.trip-planner', 'footer.contact'].map(l => <li key={l}><a href="#" className="text-gray-400 hover:text-orange-500 text-sm">{t(l)}</a></li>)}</ul></div>
+            <div><h4 className="font-bold mb-4">{t('footer.support')}</h4><ul className="space-y-2">{['footer.help-center', 'footer.faqs', 'footer.privacy'].map(l => <li key={l}><a href="#" className="text-gray-400 hover:text-orange-500 text-sm">{t(l)}</a></li>)}</ul></div>
             <div>
-              <h4 className="font-bold mb-4">Newsletter</h4>
-              <p className="text-gray-400 text-sm mb-4">Get travel updates and tips</p>
-              <div className="flex gap-2"><input type="email" placeholder="Your email" className="flex-1 px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 focus:outline-none focus:border-orange-500 text-sm" /><button className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-600 rounded-lg font-semibold text-sm">Go</button></div>
+              <h4 className="font-bold mb-4">{t('footer.newsletter')}</h4>
+              <p className="text-gray-400 text-sm mb-4">{t('footer.newsletter-sub')}</p>
+              <div className="flex gap-2"><input type="email" placeholder={t('footer.email')} className="flex-1 px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 focus:outline-none focus:border-orange-500 text-sm" /><button className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-600 rounded-lg font-semibold text-sm">{t('footer.go')}</button></div>
             </div>
           </div>
-          <div className="border-t border-gray-700 pt-6 text-center text-gray-400 text-sm">© 2026 Chhattisgarh Tourism · Photos: CTB & Wikimedia Commons · Geographic routing powered by Haversine algorithm <span className="text-gray-600">· build v3-direct-rest</span></div>
+          <div className="border-t border-gray-700 pt-6 text-center text-gray-400 text-sm">© 2026 {t('brand')} · {t('footer.photos')} · {t('footer.routing-attribution')} <span className="text-gray-600">· build v3-direct-rest</span></div>
         </div>
       </footer>
 
@@ -1669,7 +1717,7 @@ export default function AITripPlanner() {
         <div className="fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[80vh] flex flex-col detail-modal">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold flex items-center gap-2"><Bookmark className="text-orange-500" size={22} />My Saved Trips</h3>
+              <h3 className="text-xl font-bold flex items-center gap-2"><Bookmark className="text-orange-500" size={22} />{t('trips.title')}</h3>
               <button onClick={() => setMyTripsOpen(false)} className="p-2 hover:bg-gray-100 rounded-full"><X size={20} /></button>
             </div>
             {myTripsLoading ? (
@@ -1690,7 +1738,7 @@ export default function AITripPlanner() {
                 {myTrips.map(trip => (
                   <div key={trip.id} className="flex items-center gap-2 border border-gray-200 rounded-xl hover:border-orange-300 transition-all p-2">
                     <button onClick={() => openSavedTrip(trip.id)} className="flex-1 text-left p-2">
-                      <p className="font-bold text-gray-800 mb-1">{trip.name || 'Untitled Trip'}</p>
+                      <p className="font-bold text-gray-800 mb-1">{trip.name || t('trips.untitled')}</p>
                       <div className="flex flex-wrap gap-2 text-xs text-gray-500">
                         {trip.days && <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{trip.days} day{trip.days !== 1 ? 's' : ''}</span>}
                         {trip.starting_district && <span className="bg-orange-50 text-orange-700 px-2 py-0.5 rounded-full">{trip.starting_district}</span>}
@@ -1724,6 +1772,7 @@ export default function AITripPlanner() {
                   onChange={(e) => setSaveName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && saveName.trim() && !saving) handleSaveItinerary(); }}
                   placeholder="e.g. Bastar Waterfall Adventure"
+                  maxLength={120}
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 mb-4"
                 />
                 {saveError && <p className="text-red-600 text-sm mb-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{saveError}</p>}
@@ -1745,7 +1794,7 @@ export default function AITripPlanner() {
                     {copied ? <Check size={14} /> : <Copy size={14} />}{copied ? 'Copied' : 'Copy'}
                   </button>
                 </div>
-                <button onClick={() => setSaveModalOpen(false)} className="w-full border-2 border-gray-300 rounded-xl font-semibold py-3 hover:bg-gray-50">Close</button>
+                <button onClick={() => setSaveModalOpen(false)} className="w-full border-2 border-gray-300 rounded-xl font-semibold py-3 hover:bg-gray-50">{t('place.close')}</button>
               </>
             )}
           </div>
@@ -1757,7 +1806,7 @@ export default function AITripPlanner() {
         <div className="fixed inset-0 z-[95] bg-gray-50 flex items-center justify-center">
           <div className="text-center">
             <Loader2 size={48} className="text-orange-500 animate-spin mx-auto mb-4" />
-            <p className="text-gray-600 font-semibold">Loading saved itinerary…</p>
+            <p className="text-gray-600 font-semibold">{t('trips.loading')}</p>
           </div>
         </div>
       )}
@@ -1766,12 +1815,12 @@ export default function AITripPlanner() {
         <div className="fixed inset-0 z-[95] bg-gray-50 flex items-center justify-center p-4">
           <div className="bg-white border-2 border-gray-200 rounded-2xl p-8 max-w-md w-full text-center">
             <p className="text-4xl mb-4">🗺️</p>
-            <h3 className="text-xl font-bold mb-2">Itinerary Not Found</h3>
+            <h3 className="text-xl font-bold mb-2">{t('trips.not-found')}</h3>
             <p className="text-gray-600 text-sm mb-6">{savedTripError}</p>
             <button
               onClick={() => { setSavedTripError(''); window.location.search = ''; }}
               className="px-8 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full font-semibold hover:shadow-lg"
-            >Return Home</button>
+            >{t('common.return-home')}</button>
           </div>
         </div>
       )}
@@ -1781,46 +1830,46 @@ export default function AITripPlanner() {
           <div className="max-w-4xl mx-auto px-4 py-8">
             <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
               <div>
-                <h2 className="text-3xl font-bold gradient-text mb-1 flex items-center gap-2">{savedTrip.name || 'Shared Itinerary'}</h2>
+                <h2 className="text-3xl font-bold gradient-text mb-1 flex items-center gap-2">{savedTrip.name || t('trips.shared-title')}</h2>
                 <div className="flex items-center gap-2 flex-wrap mt-1">
                   {savedTrip.starting_district && (
-                    <span className="inline-flex items-center gap-1.5 bg-orange-100 text-orange-700 text-xs font-bold px-3 py-1 rounded-full"><MapPin size={12} />Starting: {savedTrip.starting_district}</span>
+                    <span className="inline-flex items-center gap-1.5 bg-orange-100 text-orange-700 text-xs font-bold px-3 py-1 rounded-full"><MapPin size={12} />{t('planner.step5.starting')}: {localizeDistrict(lang, { name: savedTrip.starting_district }).name}</span>
                   )}
                   {savedTrip.days && (
-                    <span className="inline-flex items-center gap-1.5 bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-full"><Calendar size={12} />{savedTrip.days} Days</span>
+                    <span className="inline-flex items-center gap-1.5 bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-full"><Calendar size={12} />{t('common.day', { count: savedTrip.days })}</span>
                   )}
                   {savedTrip.itinerary.itinerary && (
-                    <span className="inline-flex items-center gap-1.5 bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full"><Navigation size={12} />{new Set(savedTrip.itinerary.itinerary.flatMap(d => d.uniqueDistricts)).size} Districts</span>
+                    <span className="inline-flex items-center gap-1.5 bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full"><Navigation size={12} />{t('common.districts-count', { count: new Set(savedTrip.itinerary.itinerary.flatMap(d => d.uniqueDistricts)).size })}</span>
                   )}
                   {savedTrip.created_at && (
-                    <span className="inline-flex items-center gap-1.5 bg-gray-100 text-gray-600 text-xs font-bold px-3 py-1 rounded-full"><Clock size={12} />Saved {new Date(savedTrip.created_at).toLocaleDateString()}</span>
+                    <span className="inline-flex items-center gap-1.5 bg-gray-100 text-gray-600 text-xs font-bold px-3 py-1 rounded-full"><Clock size={12} />{t('trips.saved-on', { date: new Date(savedTrip.created_at).toLocaleDateString() })}</span>
                   )}
                 </div>
               </div>
               <button
                 onClick={() => { setSavedTrip(null); window.location.search = ''; }}
                 className="px-6 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full font-semibold hover:shadow-lg flex items-center gap-2"
-              ><Sparkles size={18} />Plan Your Own</button>
+              ><Sparkles size={18} />{t('trips.plan-own')}</button>
             </div>
 
             {savedTrip.itinerary.estimatedCost && (
               <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-5 rounded-2xl mb-6">
-                <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><Wallet className="text-green-600" size={22} />Estimated Cost</h3>
+                <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><Wallet className="text-green-600" size={22} />{t('planner.step5.cost')}</h3>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-3xl font-bold text-green-600 mb-1">₹{savedTrip.itinerary.estimatedCost.total.toLocaleString()}</p>
-                    <p className="text-sm text-gray-600">Total for {savedTrip.days || ''} day{savedTrip.days !== 1 ? 's' : ''} · {savedTrip.group_type}{savedTrip.itinerary.estimatedCost.groupSize ? ` (${savedTrip.itinerary.estimatedCost.groupSize} ${savedTrip.itinerary.estimatedCost.groupSize === 1 ? 'person' : 'people'})` : ''}</p>
+                    <p className="text-sm text-gray-600">{t('planner.step5.total-for', { n: savedTrip.days || 1 })} · {t(`planner.step2.group-${savedTrip.group_type}`)}{savedTrip.itinerary.estimatedCost.groupSize ? ` (${t(savedTrip.itinerary.estimatedCost.groupSize === 1 ? 'common.person' : 'common.people', { count: savedTrip.itinerary.estimatedCost.groupSize })})` : ''}</p>
                     {savedTrip.itinerary.estimatedCost.perDay && (
                       <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                        <span className="bg-white px-2.5 py-1 rounded-full text-green-700 font-semibold border border-green-200">₹{savedTrip.itinerary.estimatedCost.perDay.toLocaleString()}/day total</span>
-                        {savedTrip.itinerary.estimatedCost.perPersonPerDay && <span className="bg-white px-2.5 py-1 rounded-full text-green-700 font-semibold border border-green-200">₹{savedTrip.itinerary.estimatedCost.perPersonPerDay.toLocaleString()}/person/day</span>}
+                        <span className="bg-white px-2.5 py-1 rounded-full text-green-700 font-semibold border border-green-200">₹{savedTrip.itinerary.estimatedCost.perDay.toLocaleString()}{t('planner.step5.per-day-total')}</span>
+                        {savedTrip.itinerary.estimatedCost.perPersonPerDay && <span className="bg-white px-2.5 py-1 rounded-full text-green-700 font-semibold border border-green-200">₹{savedTrip.itinerary.estimatedCost.perPersonPerDay.toLocaleString()}{t('planner.step5.per-person-day')}</span>}
                       </div>
                     )}
                   </div>
                   {savedTrip.itinerary.estimatedCost.breakdown && (
                     <div className="space-y-1.5">
-                      {Object.entries(savedTrip.itinerary.estimatedCost.breakdown).map(([k, v]) => (<div key={k} className="flex justify-between text-sm"><span className="text-gray-600 capitalize">{k}</span><span className="font-semibold">₹{Number(v).toLocaleString()}</span></div>))}
-                      {savedTrip.itinerary.estimatedCost.totalTransportKm != null && <div className="flex justify-between text-xs text-gray-500 pt-1"><span>Travel distance</span><span className="font-semibold">~{Number(savedTrip.itinerary.estimatedCost.totalTransportKm).toLocaleString()} km</span></div>}
+                      {Object.entries(savedTrip.itinerary.estimatedCost.breakdown).map(([k, v]) => (<div key={k} className="flex justify-between text-sm"><span className="text-gray-600 capitalize">{t(`planner.step5.${k === 'entryFees' ? 'entry-fees' : k}`)}</span><span className="font-semibold">₹{Number(v).toLocaleString()}</span></div>))}
+                      {savedTrip.itinerary.estimatedCost.totalTransportKm != null && <div className="flex justify-between text-xs text-gray-500 pt-1"><span>{t('planner.step5.travel-distance')}</span><span className="font-semibold">~{Number(savedTrip.itinerary.estimatedCost.totalTransportKm).toLocaleString()} km</span></div>}
                     </div>
                   )}
                 </div>
@@ -1828,21 +1877,21 @@ export default function AITripPlanner() {
             )}
 
             <div className="mb-6">
-              <h3 className="font-bold text-xl mb-4 flex items-center gap-2"><Navigation className="text-orange-500" size={22} />Day-by-Day Route</h3>
+              <h3 className="font-bold text-xl mb-4 flex items-center gap-2"><Navigation className="text-orange-500" size={22} />{t('planner.step5.day-route')}</h3>
               <div className="space-y-4">{savedTrip.itinerary.itinerary.map(day => (<DayCard key={day.day} day={day} />))}</div>
             </div>
 
             {savedTrip.itinerary.insights?.length > 0 && (
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 rounded-2xl mb-6">
-                <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><Sparkles className="text-blue-600" size={20} />Route Insights</h3>
-                <div className="space-y-2">{savedTrip.itinerary.insights.map((ins, i) => (<div key={i} className="flex gap-3 items-start"><Check className="text-blue-600 mt-0.5 flex-shrink-0" size={18} /><p className="text-sm text-gray-700">{ins}</p></div>))}</div>
+                <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><Sparkles className="text-blue-600" size={20} />{t('planner.step5.insights')}</h3>
+                <div className="space-y-2">{savedTrip.itinerary.insights.map((ins, i) => (<div key={i} className="flex gap-3 items-start"><Check className="text-blue-600 mt-0.5 flex-shrink-0" size={18} /><p className="text-sm text-gray-700">{renderInsight(ins)}</p></div>))}</div>
               </div>
             )}
 
             {savedTrip.itinerary.responsibleTips?.length > 0 && (
               <div className="bg-gradient-to-r from-teal-600 to-green-700 p-5 rounded-2xl mb-6 text-white">
-                <h3 className="font-bold text-lg mb-3">🌱 Responsible Tourism Reminders</h3>
-                <div className="space-y-2">{savedTrip.itinerary.responsibleTips.map((r, i) => (<div key={i} className="flex gap-3 items-start bg-white/10 rounded-xl px-3 py-2.5"><span className="text-lg flex-shrink-0">{r.icon}</span><p className="text-sm text-teal-50">{r.tip}</p></div>))}</div>
+                <h3 className="font-bold text-lg mb-3">{t('planner.step5.responsible')}</h3>
+                <div className="space-y-2">{savedTrip.itinerary.responsibleTips.map((r, i) => (<div key={i} className="flex gap-3 items-start bg-white/10 rounded-xl px-3 py-2.5"><span className="text-lg flex-shrink-0">{r.icon}</span><p className="text-sm text-teal-50">{r.k ? t(`planner.${r.k}`) : r.tip}</p></div>))}</div>
               </div>
             )}
 
@@ -1851,7 +1900,7 @@ export default function AITripPlanner() {
                 <button
                   onClick={() => { navigator.clipboard.writeText(savedTrip.url); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
                   className="inline-flex items-center gap-2 px-6 py-3 border-2 border-orange-300 text-orange-700 rounded-full font-semibold hover:bg-orange-50 transition-all"
-                >{copied ? <Check size={16} /> : <Link2 size={16} />}{copied ? 'Link Copied' : 'Copy Share Link'}</button>
+                >{copied ? <Check size={16} /> : <Link2 size={16} />}{copied ? t('save.copied') : t('save.share-link')}</button>
               )}
             </div>
           </div>
