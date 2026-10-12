@@ -4,7 +4,7 @@ Chhattisgarh tourism destination preview app built with React and Tailwind CSS.
 
 ## Live Demo
 
-Deployed live on Vercel: **(https://chhattisgarh-travel-planner.vercel.app)**
+▶ **Live demo:** [https://chhattisgarh-travel-planner.vercel.app](https://chhattisgarh-travel-planner.vercel.app)
 
 ## Getting Started
 
