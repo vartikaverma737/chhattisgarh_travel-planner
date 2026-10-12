@@ -10,6 +10,8 @@ import { useLanguage, LANGUAGES } from './i18n';
 import { localizeDistrict } from './districtData';
 import { localizePlaceName } from './placeNamesData';
 import { localizePlace } from './placeData';
+import useRecommender from './recommender/useRecommender';
+import SUPPLEMENTAL_PLACES from './supplemental';
 
 const CTB = 'https://portal-tourism.cgstate.gov.in/files/';
 const WM = 'https://upload.wikimedia.org/wikipedia/commons/thumb/';
@@ -500,6 +502,18 @@ const ALL_DISTRICTS = [
   ]},
 ];
 
+// Supplemental places (src/supplemental) merged into the runtime catalogue.
+// Every new place gets its district banner as the primary image so
+// getPlaceImages() can build a fallback set instead of returning []. The ML
+// extractor mirrors this merge (ml/scripts/extract_catalog.mjs).
+const DISTRICTS = ALL_DISTRICTS.map(d => ({
+  ...d,
+  touristPlaces: [
+    ...(d.touristPlaces || []),
+    ...(SUPPLEMENTAL_PLACES[d.name] || []).map(p => ({ ...p, image: d.image || FALLBACK })),
+  ],
+}));
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
@@ -546,7 +560,8 @@ export default function AITripPlanner() {
   const [myTripsLoading, setMyTripsLoading] = useState(false);
   const [myTripsError, setMyTripsError] = useState('');
 
-  const districts = ALL_DISTRICTS;
+  const districts = DISTRICTS;
+  const rec = useRecommender(districts);
 
   function getDistrictColor(districtName) {
     if (districtColorIndexRef.current[districtName] === undefined) {
@@ -608,7 +623,18 @@ export default function AITripPlanner() {
           results.push({ type: 'place', data: p, district: d, matchedText: p.name });
       });
     });
-    setSearchResults(results.slice(0, 10));
+    rec.recordSearch(query);
+    setSearchResults(rec.rankSearch(results, query).slice(0, 10));
+  };
+
+  const openPlaceDetail = (place, district) => {
+    rec.recordView(place, district?.name || place.districtName);
+    setSelectedPlaceDetail({
+      ...place,
+      _images: getPlaceImages(place.name, district?.name || '', place.image),
+      _district: district?.name || place.districtName,
+      _coords: district?.coordinates || place.coords,
+    });
   };
 
   const toggleInterest = (interest) => {
@@ -1082,7 +1108,7 @@ export default function AITripPlanner() {
                 {showSearchResults && searchResults.length > 0 && (
                   <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl overflow-hidden max-h-96 overflow-y-auto z-50">
                     {searchResults.map((r, i) => (
-                      <button key={i} onClick={() => { if (r.type === 'district') setViewingDistrictPlaces(r.data); else setViewingDistrictPlaces(r.district); setShowSearchResults(false); setSearchQuery(''); }}
+                      <button key={i} onClick={() => { if (r.type === 'district') { setViewingDistrictPlaces(r.data); } else { openPlaceDetail(r.data, r.district); } setShowSearchResults(false); setSearchQuery(''); }}
                         className="w-full px-6 py-4 text-left hover:bg-orange-50 transition-colors border-b border-gray-100 last:border-0">
                         <div className="flex items-center gap-4">
                           <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
@@ -1091,6 +1117,9 @@ export default function AITripPlanner() {
                           <div className="flex-1">
                             <p className="font-bold text-gray-800">{r.type === 'district' ? localizeDistrict(lang, r.data).name : localizePlaceName(lang, r.data)}</p>
                             <p className="text-sm text-gray-600">{r.type === 'district' ? localizeDistrict(lang, r.data).desc : `${r.data.type} · ${localizeDistrict(lang, r.district).name} ${t('dest.district-suffix')}`}</p>
+                            {r.type === 'place' && r.becauseOf && (
+                              <p className="text-[11px] font-semibold text-orange-600 mt-1">▶ {t('rec.because', { name: localizePlaceName(lang, { name: r.becauseOf }) })}</p>
+                            )}
                           </div>
                           <ChevronRight className="text-gray-400" size={20} />
                         </div>
@@ -1127,6 +1156,53 @@ export default function AITripPlanner() {
           <div><div className="text-3xl font-bold">{totalPlaces}+</div><div className="text-sm opacity-90">{t('stats.places')}</div></div>
           <div><div className="text-3xl font-bold">44</div><div className="text-sm opacity-90">{t('stats.wildlife')}</div></div>
           <div><div className="text-3xl font-bold">5</div><div className="text-sm opacity-90">{t('stats.national-parks')}</div></div>
+        </div>
+      </div>
+
+      {/* ── RECOMMENDED FOR YOU (YouTube-style strip) ── */}
+      <div className="py-16 bg-white">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex items-end justify-between mb-8 gap-4 flex-wrap">
+            <div>
+              <h2 className="text-3xl md:text-4xl font-bold flex items-center gap-3">
+                {rec.profileCount > 0 ? <Sparkles className="text-orange-500" size={28} /> : <TrendingUp className="text-orange-500" size={28} />}
+                <span className="gradient-text">{rec.profileCount > 0 ? t('rec.for-you') : t('rec.trending')}</span>
+              </h2>
+              <p className="text-gray-500 text-sm mt-2">{rec.profileCount > 0 ? t('rec.for-you-sub') : t('rec.trending-sub')}</p>
+            </div>
+            {rec.profileCount > 0 && (
+              <button onClick={rec.clearHistory} className="text-xs font-semibold text-gray-500 hover:text-orange-600 underline decoration-dotted flex items-center gap-1">
+                <X size={12} />{t('rec.clear')}
+              </button>
+            )}
+          </div>
+          <div className="flex gap-5 overflow-x-auto pb-4 -mx-4 px-4 snap-x">
+            {rec.recommend(12).map(({ item, sim, reasons }) => (
+              <button
+                key={item.name}
+                onClick={() => openPlaceDetail(item, { name: item.districtName, coordinates: item.coords })}
+                className="group flex-shrink-0 w-72 snap-start text-left bg-white rounded-2xl border border-gray-100 shadow-md overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all">
+                <div className="relative h-40 overflow-hidden">
+                  <ImgWithFallback src={item.image} alt="" districtName={item.districtName} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                  {item.type && <div className="absolute top-3 left-3 bg-black/60 text-white text-[11px] font-bold px-2.5 py-1 rounded-full backdrop-blur-sm">{item.type}</div>}
+                  <div className="absolute top-3 right-3 flex items-center gap-1 bg-white/90 text-gray-800 text-xs font-bold px-2 py-1 rounded-full"><Star size={12} className="text-amber-500 fill-amber-500" />{item.rating}</div>
+                </div>
+                <div className="p-4">
+                  <p className="font-bold text-gray-900 leading-tight text-sm line-clamp-2">{localizePlaceName(lang, item)}</p>
+                  <p className="text-xs text-gray-500 mt-1">{localizeDistrict(lang, { name: item.districtName }).name} {t('dest.district-suffix')}</p>
+                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                    {reasons.map(rk => (
+                      <span key={rk} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${rk === 'similar' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
+                        {rk === 'similar' ? t('rec.reason.similar') : t('rec.reason.trend')}
+                      </span>
+                    ))}
+                    {rec.profileCount > 0 && sim !== undefined && <span className="text-[10px] text-gray-400">{(sim * 100).toFixed(0)}% {t('rec.match')}</span>}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -1318,7 +1394,7 @@ export default function AITripPlanner() {
                           <span className="text-xs font-semibold text-gray-600">{place.rating}</span>
                         </div>
                         <button
-                          onClick={() => setSelectedPlaceDetail({ ...place, _images: placeImgs, _district: viewingDistrictPlaces.name, _coords: viewingDistrictPlaces.coordinates })}
+                          onClick={() => openPlaceDetail(place, viewingDistrictPlaces)}
                           className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 text-orange-600 hover:from-orange-500 hover:to-red-600 hover:text-white hover:border-transparent px-4 py-2.5 rounded-lg font-semibold text-sm transition-all">
                           <Info size={16} />{t('place.view-details')}
                         </button>
@@ -1396,6 +1472,33 @@ export default function AITripPlanner() {
                 <button onClick={() => { setSelectedPlaceDetail(null); setShowTripPlanner(true); }} className="flex-1 bg-gradient-to-r from-orange-500 to-red-600 text-white px-5 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 text-sm"><Sparkles size={16} />{t('place.plan-here')}</button>
                 <button onClick={() => setSelectedPlaceDetail(null)} className="flex-1 border-2 border-gray-200 text-gray-700 px-5 py-3 rounded-xl font-semibold text-sm">{t('place.close')}</button>
               </div>
+              {(() => {
+                const similar = rec.similarTo(selectedPlaceDetail, 6);
+                return similar.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-1"><Sparkles size={16} className="text-orange-500" />{t('rec.similar')}</h3>
+                    <p className="text-xs text-gray-500 mb-4">{t('rec.similar-sub', { name: localizePlaceName(lang, selectedPlaceDetail) })}</p>
+                    <div className="flex flex-col gap-3">
+                      {similar.map(({ item, similarity }) => (
+                        <button
+                          key={item.name}
+                          onClick={() => openPlaceDetail(item, { name: item.districtName, coordinates: item.coords })}
+                          className="flex items-center gap-3 text-left bg-orange-50/60 hover:bg-orange-50 border border-orange-100 rounded-xl p-2.5 transition-colors">
+                          <div className="w-20 h-14 rounded-lg overflow-hidden flex-shrink-0">
+                            <ImgWithFallback src={item.image} alt="" className="w-full h-full object-cover" districtName={item.districtName} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-gray-900 text-sm truncate">{localizePlaceName(lang, item)}</p>
+                            <p className="text-xs text-gray-500">{item.type} · {localizeDistrict(lang, { name: item.districtName }).name}</p>
+                            <div className="flex items-center gap-1 mt-0.5"><Star size={11} className="text-amber-500 fill-amber-500" /><span className="text-xs font-semibold text-gray-600">{item.rating}</span><span className="text-[10px] text-gray-400 ml-1">{(similarity * 100).toFixed(0)}% {t('rec.match')}</span></div>
+                          </div>
+                          <ChevronRight className="text-orange-400 flex-shrink-0" size={16} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

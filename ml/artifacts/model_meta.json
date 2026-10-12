@@ -1,0 +1,9 @@
+{
+  "places": 385,
+  "features": 1500,
+  "embed_dim": 20,
+  "explained_variance": 0.19228407024682087,
+  "districts": 33,
+  "random_state": 42,
+  "n_neighbors": 10
+}

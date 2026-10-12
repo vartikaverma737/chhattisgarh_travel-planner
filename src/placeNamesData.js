@@ -1,3 +1,5 @@
+import SUPPLEMENTAL_LANG from './supplemental/lang';
+
 const P = (h, c) => (c === undefined ? { h, c: h } : { h, c });
 
 const data = {
@@ -241,6 +243,14 @@ const data = {
   'Bhainsamundi Skywalk': P('भैंसामुंडी स्काईवॉक'),
   'Surajpur Urban Haat': P('सूरजपुर शहरी हाट'),
 };
+
+// Supplemental names (src/supplemental/lang) keyed by exact English place name.
+const supplementNames = {};
+Object.keys(SUPPLEMENTAL_LANG).forEach(name => {
+  const tr = SUPPLEMENTAL_LANG[name];
+  if (tr && tr.hi && tr.cg) supplementNames[name] = P(tr.hi.name, tr.cg.name);
+});
+Object.assign(data, supplementNames);
 
 export function localizePlaceName(lang, place) {
   if (lang !== 'hi' && lang !== 'cg') return place.name;

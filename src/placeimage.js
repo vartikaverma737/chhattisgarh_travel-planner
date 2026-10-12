@@ -175,7 +175,7 @@ export const PLACE_IMAGES = {
     `${CTB}gangrel-bandh-image.webp`,
   ],
 
-  // ══════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════
   // DURG
   // ══════════════════════════════════════════════════════════════════════
   'Uwasaggaharam Parshwa Teerth': [
@@ -183,8 +183,10 @@ export const PLACE_IMAGES = {
     `${CTB}gangrel-bandh-image.webp`,
   ],
   'Maitri Bagh Zoo': [
-    `${CTB}2022-12-13.jpg`,
-    `${CTB}m_Bhilai_Bhilai_steel_plant_1_l_470_640.jpg`,
+    `${WMF}4/46/Maitri_bagh1.JPG`,
+    `${WMF}7/7a/Maitri_bagh2.JPG`,
+    `${WMF}0/00/Maitri_bagh4_%28cropped%29.JPG`,
+    `${WMF}2/2c/Maitri_bagh4.JPG`,
   ],
   'Tandula Dam': [
     `${WM}f/f7/Tandula_Dam_Balod.jpg/500px-Tandula_Dam_Balod.jpg`,
@@ -196,6 +198,93 @@ export const PLACE_IMAGES = {
     `${CTB}2022-12-13.jpg`,
     `${CTB}m_Bhilai_Bhilai_steel_plant_1_l_470_640.jpg`,
     `${CTB}gangrel-bandh-image.webp`,
+  ],
+  'Surya Cinema Durg': [
+    `${CTB}2022-12-13.jpg`,
+    `${CTB}gangrel-bandh-image.webp`,
+  ],
+  'Bhilai Maitri Bagh Lakefront': [
+    `${WMF}7/7a/Maitri_bagh2.JPG`,
+    `${WMF}4/46/Maitri_bagh1.JPG`,
+    `${WMF}0/0d/Maitri_bagh5.JPG`,
+    `${CTB}2022-12-13.jpg`,
+  ],
+  'Hotel Fire Park': [
+    `${CTB}2022-12-13.jpg`,
+    `${CTB}gangrel-bandh-image.webp`,
+  ],
+  'Nukkad Tea Cafe (Nehru Nagar, Bhilai)': [
+    `${CTB}2022-12-13.jpg`,
+    `${CTB}gangrel-bandh-image.webp`,
+  ],
+
+  // ── DURG — SUPPLEMENTAL PLACES IMAGE MAPPINGS ──────────────────────────
+  'Shakti Temple Circuit, Bhilai': [
+    `${CTB}2022-12-13.jpg`,
+    `${CTB}m_Bhilai_Bhilai_steel_plant_1_l_470_640.jpg`,
+    `${CTB}gangrel-bandh-image.webp`,
+  ],
+  'Nagpura Hanuman Temple Caves': [
+    `${CTB}2022-12-13.jpg`,
+    `${CTB}gangrel-bandh-image.webp`,
+  ],
+  'Shivnath Historical Ghat, Durg': [
+    `${CTB}2022-12-13.jpg`,
+    `${CTB}gangrel-bandh-image.webp`,
+  ],
+  'Bhilai Steel City Kannamal Park': [
+    `${CTB}2022-12-13.jpg`,
+    `${CTB}m_Bhilai_Bhilai_steel_plant_1_l_470_640.jpg`,
+    `${CTB}gangrel-bandh-image.webp`,
+  ],
+  'Chhattisgarhi Dal-Bhaji Stall (Civil Lines Durg)': [
+    `${CTB}2022-12-13.jpg`,
+    `${CTB}gangrel-bandh-image.webp`,
+  ],
+  'Family Bhoj Durg': [
+    `${CTB}2022-12-13.jpg`,
+    `${CTB}gangrel-bandh-image.webp`,
+  ],
+  'Mahadev Temple, Deobaloda': [
+    `${WMF}7/71/Mahadev_Temple_Deobaloda%2C_Durg_Chhattisgarh_-_14.jpg`,
+    `${WMF}c/c3/Mahadev_Temple_Deobaloda%2C_Durg_Chhattisgarh_-_15.jpg`,
+    `${WMF}1/1a/Mahadev_Temple_Deobaloda%2C_Durg_Chhattisgarh_-_12.jpg`,
+    `${WMF}7/79/Mahadev_Temple_Deobaloda%2C_Durg_Chhattisgarh_-_23.jpg`,
+    `${WMF}0/06/Mahadev_Temple_Deobaloda_Nandi%2C_Durg_Chhattisgarh_-_36.jpg`,
+  ],
+  'Dhamdha Chaturbhuji & Shiva Temple Group': [
+    `${WMF}2/20/0100922_Mahamaya_temple_and_Dhamdha_fort%2C_Chhattisgarh_005.jpg`,
+    `${WMF}7/74/0100922_Mahamaya_temple_and_Dhamdha_fort%2C_Chhattisgarh_058.jpg`,
+    `${WMF}0/0b/0100922_Mahamaya_temple_and_Dhamdha_fort%2C_Chhattisgarh_065.jpg`,
+    `${WMF}e/e4/0100922_Mahamaya_temple_and_Dhamdha_fort%2C_Chhattisgarh_070.jpg`,
+    `${WMF}c/c8/0100922_Mahamaya_temple_and_Dhamdha_fort%2C_Chhattisgarh_081.jpg`,
+  ],
+  'Ancient Vishnu Temple, Banbarad': [
+    `${CTB}2022-12-13.jpg`,
+    `${CTB}gangrel-bandh-image.webp`,
+  ],
+  'Nagdev Temple, Nagpura': [
+    `${WMF}3/33/Nagpura_Shiv_temple_Durg.jpg`,
+    `${CTB}2022-12-13.jpg`,
+    `${CTB}gangrel-bandh-image.webp`,
+  ],
+  'Langurveer Mandir, Durg': [
+    `${CTB}2022-12-13.jpg`,
+    `${CTB}gangrel-bandh-image.webp`,
+  ],
+  'Chandi Mandir, Durg': [
+    `${WMF}1/10/Chandi_mandir%2Cdurg.JPG`,
+    `${WMF}9/92/%E0%A6%A6%E0%A7%81%E0%A6%B0%E0%A7%8D%E0%A6%97_%E0%A6%9A%E0%A6%A3%E0%A7%8D%E0%A6%A1%E0%A7%80_%E0%A6%AE%E0%A6%A8%E0%A7%8D%E0%A6%A6%E0%A6%BF%E0%A6%B0_%E0%A7%A7%E0%A7%AB.jpg`,
+    `${WMF}9/93/%E0%A6%A6%E0%A7%81%E0%A6%B0%E0%A7%8D%E0%A6%97_%E0%A6%9A%E0%A6%A3%E0%A7%8D%E0%A6%A1%E0%A7%80_%E0%A6%AE%E0%A6%A8%E0%A7%8D%E0%A6%A6%E0%A6%BF%E0%A6%B0_%E0%A7%A7%E0%A7%A8.jpg`,
+  ],
+  'Dakshinmukhi Hanuman Temple, Durg': [
+    `${CTB}2022-12-13.jpg`,
+    `${CTB}gangrel-bandh-image.webp`,
+  ],
+  'Jagannath Mandir, Durg': [
+    `${WMF}1/13/%E0%A6%A6%E0%A7%81%E0%A6%B0%E0%A7%8D%E0%A6%97_%E0%A6%9C%E0%A6%97%E0%A6%A8%E0%A7%8D%E0%A6%A8%E0%A6%BE%E0%A6%A5_%E0%A6%AE%E0%A6%A8%E0%A7%8D%E0%A6%A6%E0%A6%BF%E0%A6%B0_%E0%A7%A7%E0%A7%A8.jpg`,
+    `${WMF}9/96/%E0%A6%A6%E0%A7%81%E0%A6%B0%E0%A7%8D%E0%A6%97_%E0%A6%9C%E0%A6%97%E0%A6%A8%E0%A7%8D%E0%A6%A8%E0%A6%BE%E0%A6%A5_%E0%A6%AE%E0%A6%A8%E0%A7%8D%E0%A6%A6%E0%A6%BF%E0%A6%B0_%E0%A7%A7%E0%A7%AB.jpg`,
+    `${WMF}d/dd/%E0%A6%A6%E0%A7%81%E0%A6%B0%E0%A7%8D%E0%A6%97_%E0%A6%9C%E0%A6%97%E0%A6%A8%E0%A7%8D%E0%A6%A8%E0%A6%BE%E0%A6%A5_%E0%A6%AE%E0%A6%A8%E0%A7%8D%E0%A6%A6%E0%A6%BF%E0%A6%B0_%E0%A7%A7%E0%A7%AE.jpg`,
   ],
 
   // ══════════════════════════════════════════════════════════════════════

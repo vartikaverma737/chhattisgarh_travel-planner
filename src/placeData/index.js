@@ -33,8 +33,9 @@ import sakti from './sakti';
 import sarangarh from './sarangarh';
 import sukma from './sukma';
 import surajpur from './surajpur';
+import SUPPLEMENTAL_LANG from '../supplemental/lang';
 
-export const PLACE_TRANSLATIONS = Object.assign({}, raipur1, raipur2, raipur3, bilaspur, bastar, durg, rajnandgaon, korba, surguja, mahasamund, dhamtari, gariyaband, kabirdham, jashpur, korea, dantewada, kanker, kondagaon, balod, balodabazar, balrampur, bemetara, bijapur, gpm, janjgirchampa, khairagarh, mcmb, mohla, mungeli, narayanpur, raigarh, sakti, sarangarh, sukma, surajpur);
+export const PLACE_TRANSLATIONS = Object.assign({}, raipur1, raipur2, raipur3, bilaspur, bastar, durg, rajnandgaon, korba, surguja, mahasamund, dhamtari, gariyaband, kabirdham, jashpur, korea, dantewada, kanker, kondagaon, balod, balodabazar, balrampur, bemetara, bijapur, gpm, janjgirchampa, khairagarh, mcmb, mohla, mungeli, narayanpur, raigarh, sakti, sarangarh, sukma, surajpur, SUPPLEMENTAL_LANG);
 
 export function localizePlace(lang, place) {
   if (!place || lang === 'en') return place;

@@ -1,0 +1,13 @@
+{
+  "recall@5": 0.0208,
+  "random_baseline@5": 0.0125,
+  "lift@5": 1.67,
+  "recall@10": 0.0458,
+  "random_baseline@10": 0.0292,
+  "lift@10": 1.57,
+  "recall@20": 0.0833,
+  "random_baseline@20": 0.0458,
+  "lift@20": 1.82,
+  "users": 60,
+  "targets": 240
+}
