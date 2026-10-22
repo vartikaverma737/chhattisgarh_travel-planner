@@ -1,5 +1,25 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, X, ZoomIn, Grid, Play, ImageOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, ZoomIn, Grid, Play, Camera } from 'lucide-react';
+import { useLanguage } from './i18n';
+
+// ─── NO-PHOTO PLACEHOLDER ─────────────────────────────────────────────────────
+// Shown only when a place has no verified photo at all. It is deliberately
+// designed (not a grey error box) so a card never looks broken.
+function PhotoPlaceholder({ placeName, height = 'h-44', rounded = '' }) {
+  const { t } = useLanguage();
+  return (
+    <div className={`relative ${height} ${rounded} overflow-hidden bg-gradient-to-br from-orange-50 via-amber-50 to-orange-100 flex items-center justify-center`}>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_18%,rgba(249,115,22,0.20),transparent_55%),radial-gradient(circle_at_78%_84%,rgba(245,158,11,0.18),transparent_50%)]" />
+      <div className="relative text-center px-6">
+        <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-white/90 shadow-sm flex items-center justify-center">
+          <Camera size={22} className="text-orange-500" />
+        </div>
+        {placeName && <p className="text-xs font-semibold text-orange-900/85 truncate">{placeName}</p>}
+        <p className="text-[11px] text-orange-700/70 mt-0.5">{t('place.photo-unavailable')}</p>
+      </div>
+    </div>
+  );
+}
 
 // ─── THUMBNAIL STRIP CAROUSEL (used inside place cards in the district modal) ─
 export function PlaceImageCarousel({ images, placeName, onOpenLightbox, primaryImage }) {
@@ -22,16 +42,7 @@ export function PlaceImageCarousel({ images, placeName, onOpenLightbox, primaryI
     : allImgs[idx];
 
   if (total === 0) {
-    return (
-      <div className="relative h-44 overflow-hidden bg-gray-100 group">
-        <div className="w-full h-full flex items-center justify-center">
-          <div className="text-center text-gray-400">
-            <ImageOff size={32} className="mx-auto mb-2" />
-            <p className="text-xs font-medium">Photo unavailable</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <PhotoPlaceholder placeName={placeName} />;
   }
 
   return (
@@ -107,14 +118,7 @@ export function PlaceImageGrid({ images, placeName, onOpenLightbox }) {
   const src = idx => imgs[idx];
 
   if (imgs.length === 0) {
-    return (
-      <div className="h-72 rounded-2xl bg-gray-100 flex items-center justify-center">
-        <div className="text-center text-gray-400">
-          <ImageOff size={32} className="mx-auto mb-2" />
-          <p className="text-sm font-medium">No photos available for this place</p>
-        </div>
-      </div>
-    );
+    return <PhotoPlaceholder placeName={placeName} height="h-72" rounded="rounded-2xl" />;
   }
 
   if (imgs.length === 1) {

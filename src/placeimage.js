@@ -804,9 +804,11 @@ export function getPlaceImages(placeName, districtName, primaryImage) {
   // No image assigned for this place — don't show any placeholder photo
   if (!primaryImage) return [];
 
-  // Build a 4-image fallback set using district image + generic fallback
+  // The district banner is the honest stand-in for a place without its own
+  // verified photo. The generic Gangrel image is deliberately left out here:
+  // it shows a different district's landmark and would misrepresent the place.
   const distFb = DISTRICT_FB[districtName] || FALLBACK;
-  const imgs = [primaryImage, distFb, FALLBACK, distFb].filter(Boolean);
+  const imgs = [primaryImage, distFb].filter(Boolean);
   // Deduplicate
   return [...new Set(imgs)].slice(0, 4);
 }

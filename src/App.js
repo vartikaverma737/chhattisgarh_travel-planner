@@ -503,13 +503,18 @@ const ALL_DISTRICTS = [
 ];
 
 // Supplemental places (src/supplemental) merged into the runtime catalogue.
-// Every new place gets its district banner as the primary image so
-// getPlaceImages() can build a fallback set instead of returning []. The ML
-// extractor mirrors this merge (ml/scripts/extract_catalog.mjs).
+// Every place without its own verified photo gets its district banner as the
+// primary image so getPlaceImages() can build a fallback set instead of
+// returning []. The generic Gangrel image counts as "no photo": it belongs to
+// a different district and would misrepresent the place. The ML extractor
+// mirrors this merge (ml/scripts/extract_catalog.mjs).
 const DISTRICTS = ALL_DISTRICTS.map(d => ({
   ...d,
   touristPlaces: [
-    ...(d.touristPlaces || []),
+    ...(d.touristPlaces || []).map(p => ({
+      ...p,
+      image: !p.image || p.image === FALLBACK ? (d.image || FALLBACK) : p.image,
+    })),
     ...(SUPPLEMENTAL_PLACES[d.name] || []).map(p => ({ ...p, image: d.image || FALLBACK })),
   ],
 }));
