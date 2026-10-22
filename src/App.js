@@ -508,7 +508,7 @@ const ALL_DISTRICTS = [
 // returning []. The generic Gangrel image counts as "no photo": it belongs to
 // a different district and would misrepresent the place. The ML extractor
 // mirrors this merge (ml/scripts/extract_catalog.mjs).
-const DISTRICTS = ALL_DISTRICTS.map(d => ({
+export const DISTRICTS = ALL_DISTRICTS.map(d => ({
   ...d,
   touristPlaces: [
     ...(d.touristPlaces || []).map(p => ({
