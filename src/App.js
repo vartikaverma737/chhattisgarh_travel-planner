@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, ChevronDown, MapPin, Calendar, Sun, Cloud, Menu, X, Search, Heart, Share2, Mountain, Camera, TreePine, Map, Navigation, Clock, Info, Users, Wallet, Sparkles, TrendingUp, ArrowRight, Check, Filter, Star, Phone, Globe, Save, Link2, Copy, Loader2, Bookmark, ExternalLink } from 'lucide-react';
 
 // ── STEP 1: Gallery imports ───────────────────────────────────────────────────
-import { PLACE_IMAGES, getPlaceImages } from './placeimage';
-import { PlaceImageCarousel, PlaceImageGrid, ImageLightbox } from './imagegallery';
+import { getPlaceImages, getPlacePhoto, getDistrictPhoto, EXPERIENCE_PHOTOS } from './placeimage';
+import { PlaceImageCarousel, PlaceImageGrid, ImageLightbox, PhotoPlaceholder } from './imagegallery';
 import GoogleMapView from './GoogleMapView';
 import { saveItinerary, fetchItinerary, listItineraries, deleteItinerary, isSupabaseConfigured } from './supabaseClient';
 import { useLanguage, LANGUAGES } from './i18n';
@@ -18,23 +18,9 @@ const WM = 'https://upload.wikimedia.org/wikipedia/commons/thumb/';
 const WMF = 'https://upload.wikimedia.org/wikipedia/commons/';
 const FALLBACK = 'https://portal-tourism.cgstate.gov.in/files/gangrel-bandh-image.webp';
 
-const DISTRICT_FALLBACKS = {
-  'Korba': `${CTB}Malhaar,%20Bilaspur%20(2).JPG`,
-  'Jashpur': `${CTB}jogimaracave.jpg`,
-  'Korea': `${CTB}gangrel-bandh-image.webp`,
-  'Kondagaon': `${WMF}c/cd/Tribal_Woman_at_Weekly_Village_Market.jpg`,
-  'Khairagarh-Chhuikhadan-Gandai': `${CTB}rajnandgaon.png`,
-  'Manendragarh-Chirmiri-Bharatpur': `https://upload.wikimedia.org/wikipedia/commons/5/5a/00chrm.jpg`,
-  'Mohla-Manpur-Ambagarh Chowki': `${CTB}2019-08-25.jpg`,
-  'Narayanpur': `${WM}c/cd/Abujmarh_%28restricted_area_in_chattisgarh%29.jpg/960px-Abujmarh_%28restricted_area_in_chattisgarh%29.jpg`,
-  'Raigarh': `${WM}3/36/Girivilas_Palace.jpg/960px-Girivilas_Palace.jpg`,
-  'Sakti': `${WM}3/3c/Maa_Beri_Wali_Mandir.jpg/960px-Maa_Beri_Wali_Mandir.jpg`,
-  'Sarangarh-Bilaigarh': `https://upload.wikimedia.org/wikipedia/commons/3/36/Girivilas_Palace.jpg`,
-  'Sukma': `${WM}1/1b/Malkan_giri_Sukma_C.G.jpg/960px-Malkan_giri_Sukma_C.G.jpg`,
-  'Surajpur': `https://upload.wikimedia.org/wikipedia/commons/1/19/MaaKudargarhiDevi.jpg`,
-  'Balrampur': `${CTB}Ruined_temple_near_Rani_Talab,_Dipadih_Kusmi_Dipadih_Chattisgarh_036.jpg`,
-  'Mungeli': `${CTB}mungeli-maon.jpg`,
-};
+// District banners are no longer hard-coded here: every photo the app shows is
+// resolved and checked by tools/place-photos/generate.mjs and lives in
+// src/placephotos.generated.js.
 
 function haversineDistance(a, b) {
   const R = 6371;
@@ -503,21 +489,32 @@ const ALL_DISTRICTS = [
 ];
 
 // Supplemental places (src/supplemental) merged into the runtime catalogue.
-// Every place without its own verified photo gets its district banner as the
-// primary image so getPlaceImages() can build a fallback set instead of
-// returning []. The generic Gangrel image counts as "no photo": it belongs to
-// a different district and would misrepresent the place. The ML extractor
+// Every place gets its photo from src/placephotos.generated.js, where each URL
+// was checked against the district the place belongs to. `photoKind` records
+// whether the photo shows the place itself or the district, so a card can say
+// so instead of pretending the photo is of that exact place. The ML extractor
 // mirrors this merge (ml/scripts/extract_catalog.mjs).
-export const DISTRICTS = ALL_DISTRICTS.map(d => ({
-  ...d,
-  touristPlaces: [
-    ...(d.touristPlaces || []).map(p => ({
+export const DISTRICTS = ALL_DISTRICTS.map(d => {
+  const districtPhoto = getDistrictPhoto(d.name);
+  const banner = districtPhoto?.url || '';
+  const withPhoto = p => {
+    const photo = getPlacePhoto(p.name, d.name, p.image);
+    return {
       ...p,
-      image: !p.image || p.image === FALLBACK ? (d.image || FALLBACK) : p.image,
-    })),
-    ...(SUPPLEMENTAL_PLACES[d.name] || []).map(p => ({ ...p, image: d.image || FALLBACK })),
-  ],
-}));
+      image: photo?.url || banner,
+      photoKind: photo?.kind || 'district-banner',
+      photoTitle: photo?.title || '',
+    };
+  };
+  return {
+    ...d,
+    image: banner,
+    touristPlaces: [
+      ...(d.touristPlaces || []).map(withPhoto),
+      ...(SUPPLEMENTAL_PLACES[d.name] || []).map(withPhoto),
+    ],
+  };
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
@@ -898,9 +895,20 @@ export default function AITripPlanner() {
     const [imgSrc, setImgSrc] = useState(src);
     const [attempt, setAttempt] = useState(0);
     const handleError = () => {
-      if (attempt === 0) { setAttempt(1); setImgSrc((districtName && DISTRICT_FALLBACKS[districtName]) || FALLBACK); }
-      else if (attempt === 1) { setAttempt(2); setImgSrc(FALLBACK); }
+      // Only ever fall back to a photo of the same district; when there is none
+      // the designed placeholder is shown instead of a photo of another place.
+      if (attempt === 0) {
+        const districtPhoto = districtName ? getDistrictPhoto(districtName)?.url : null;
+        if (districtPhoto && districtPhoto !== imgSrc) {
+          setAttempt(1);
+          setImgSrc(districtPhoto);
+        } else {
+          setAttempt(1);
+          setImgSrc('');
+        }
+      }
     };
+    if (!imgSrc) return <PhotoPlaceholder placeName={alt} height="h-full" rounded="" />;
     return <img src={imgSrc} alt={alt} className={className} onError={handleError} />;
   };
 
@@ -1245,7 +1253,7 @@ export default function AITripPlanner() {
               {TRIBAL_ECO_EXPERIENCES.map(exp => (
                 <div key={exp.id} className="bg-white rounded-2xl overflow-hidden shadow-md card-hover border border-gray-100">
                   <div className="relative h-40 overflow-hidden">
-                    <ImgWithFallback src={exp.image} alt={t(`tribal.exp.${exp.id}.title`)} className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" />
+                    <ImgWithFallback src={EXPERIENCE_PHOTOS[exp.id]?.url || exp.image} alt={t(`tribal.exp.${exp.id}.title`)} className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" districtName={exp.district} />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                     <div className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-xs font-bold ${exp.category === 'tribal' ? 'bg-amber-400 text-amber-900' : exp.category === 'ecotourism' ? 'bg-green-400 text-green-900' : 'bg-violet-400 text-violet-900'}`}>
                       {exp.icon} {t(exp.category === 'tribal' ? 'cat.tribal' : exp.category === 'ecotourism' ? 'cat.eco' : 'cat.culture')}
@@ -1381,6 +1389,8 @@ export default function AITripPlanner() {
                         images={placeImgs}
                         placeName={place.name}
                         primaryImage={place.image}
+                        photoKind={place.photoKind}
+                        districtName={viewingDistrictPlaces.name}
                         onOpenLightbox={(startIdx) =>
                           setLightbox({ images: placeImgs, placeName: place.name, startIndex: startIdx })
                         }
@@ -1534,7 +1544,7 @@ export default function AITripPlanner() {
                     <button key={d.name} onClick={() => setStartingDistrict(d.name)}
                       className={`relative rounded-xl overflow-hidden text-left transition-all ${startingDistrict === d.name ? 'ring-4 ring-orange-400 ring-offset-2' : 'border-2 border-gray-200 hover:border-orange-300'}`}>
                       <div className="relative h-20 overflow-hidden">
-                        <img src={d.image} alt={dl.name} className="w-full h-full object-cover" onError={e => { e.target.src = DISTRICT_FALLBACKS[d.name] || FALLBACK; }} />
+                        <ImgWithFallback src={d.image} alt={dl.name} className="w-full h-full object-cover" districtName={d.name} />
                         <div className={`absolute inset-0 ${startingDistrict === d.name ? 'bg-orange-500/40' : 'bg-black/30'}`} />
                         {startingDistrict === d.name && <div className="absolute top-2 right-2 bg-white rounded-full p-0.5"><Check className="text-orange-500" size={14} /></div>}
                       </div>

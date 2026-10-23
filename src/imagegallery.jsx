@@ -5,7 +5,7 @@ import { useLanguage } from './i18n';
 // ─── NO-PHOTO PLACEHOLDER ─────────────────────────────────────────────────────
 // Shown only when a place has no verified photo at all. It is deliberately
 // designed (not a grey error box) so a card never looks broken.
-function PhotoPlaceholder({ placeName, height = 'h-44', rounded = '' }) {
+export function PhotoPlaceholder({ placeName, height = 'h-44', rounded = '' }) {
   const { t } = useLanguage();
   return (
     <div className={`relative ${height} ${rounded} overflow-hidden bg-gradient-to-br from-orange-50 via-amber-50 to-orange-100 flex items-center justify-center`}>
@@ -22,10 +22,11 @@ function PhotoPlaceholder({ placeName, height = 'h-44', rounded = '' }) {
 }
 
 // ─── THUMBNAIL STRIP CAROUSEL (used inside place cards in the district modal) ─
-export function PlaceImageCarousel({ images, placeName, onOpenLightbox, primaryImage }) {
+export function PlaceImageCarousel({ images, placeName, onOpenLightbox, primaryImage, photoKind, districtName }) {
   const [current, setCurrent] = useState(0);
   const [loaded, setLoaded] = useState({});
   const [errors, setErrors] = useState({});
+  const { t } = useLanguage();
 
   const allImgs = images && images.length > 0 ? images : [primaryImage].filter(Boolean);
   const total = allImgs.length;
@@ -37,9 +38,7 @@ export function PlaceImageCarousel({ images, placeName, onOpenLightbox, primaryI
     setErrors(e => ({ ...e, [idx]: true }));
   };
 
-  const imgSrc = (idx) => errors[idx]
-    ? 'https://portal-tourism.cgstate.gov.in/files/gangrel-bandh-image.webp'
-    : allImgs[idx];
+  const imgSrc = (idx) => allImgs[idx];
 
   if (total === 0) {
     return <PhotoPlaceholder placeName={placeName} />;
@@ -48,12 +47,14 @@ export function PlaceImageCarousel({ images, placeName, onOpenLightbox, primaryI
   return (
     <div className="relative h-44 overflow-hidden bg-gray-100 group">
       {/* Main image */}
-      <img
-        src={imgSrc(current)}
-        alt={`${placeName} - image ${current + 1}`}
-        className="w-full h-full object-cover transition-opacity duration-300"
-        onError={() => handleError(current)}
-      />
+      {errors[current]
+        ? <PhotoPlaceholder placeName={placeName} height="h-44" />
+        : <img
+            src={imgSrc(current)}
+            alt={`${placeName} - image ${current + 1}`}
+            className="w-full h-full object-cover transition-opacity duration-300"
+            onError={() => handleError(current)}
+          />}
 
       {/* Gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
@@ -98,6 +99,13 @@ export function PlaceImageCarousel({ images, placeName, onOpenLightbox, primaryI
         </div>
       )}
 
+      {/* Honest label when the photo shows the district, not this exact place */}
+      {photoKind && photoKind !== 'place' && districtName && (
+        <div className="absolute bottom-2.5 left-2.5 bg-black/60 backdrop-blur-sm text-white text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">
+          {t('place.district-photo', { district: districtName })}
+        </div>
+      )}
+
       {/* Open gallery button */}
       <button
         onClick={e => { e.stopPropagation(); onOpenLightbox(current); }}
@@ -117,6 +125,16 @@ export function PlaceImageGrid({ images, placeName, onOpenLightbox }) {
   const handleError = idx => setErrors(e => ({ ...e, [idx]: true }));
   const src = idx => imgs[idx];
 
+  // A photo that cannot load shows the designed placeholder, never a photo of
+  // some other place.
+  const Tile = ({ idx, className, alt }) => (
+    errors[idx]
+      ? <div className={`${className} bg-gradient-to-br from-orange-50 via-amber-50 to-orange-100 flex items-center justify-center`}>
+          <Camera size={20} className="text-orange-300" />
+        </div>
+      : <img src={src(idx)} alt={alt} className={className} onError={() => handleError(idx)} />
+  );
+
   if (imgs.length === 0) {
     return <PhotoPlaceholder placeName={placeName} height="h-72" rounded="rounded-2xl" />;
   }
@@ -124,7 +142,7 @@ export function PlaceImageGrid({ images, placeName, onOpenLightbox }) {
   if (imgs.length === 1) {
     return (
       <div className="relative h-72 rounded-2xl overflow-hidden cursor-pointer" onClick={() => onOpenLightbox(0)}>
-        <img src={src(0)} alt={placeName} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" onError={() => handleError(0)} />
+        <Tile idx={0} alt={placeName} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
         <div className="absolute bottom-4 left-4 text-white flex items-center gap-2 text-sm font-medium">
           <ZoomIn size={16} /> View photo
@@ -138,7 +156,7 @@ export function PlaceImageGrid({ images, placeName, onOpenLightbox }) {
     <div className="grid grid-cols-2 gap-1.5 h-64 rounded-2xl overflow-hidden">
       {imgs.map((_, i) => (
         <div key={i} className="relative cursor-pointer overflow-hidden" onClick={() => onOpenLightbox(i)}>
-          <img src={src(i)} alt={`${placeName} ${i + 1}`} className="w-full h-full object-cover hover:scale-110 transition-transform duration-500" onError={() => handleError(i)} />
+          <Tile idx={i} alt={`${placeName} ${i + 1}`} className="w-full h-full object-cover hover:scale-110 transition-transform duration-500" />
           <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center">
             <ZoomIn className="text-white opacity-0 hover:opacity-100 transition-opacity" size={24} />
           </div>
@@ -152,7 +170,7 @@ export function PlaceImageGrid({ images, placeName, onOpenLightbox }) {
     <div className="grid grid-cols-3 gap-1.5 h-56 rounded-2xl overflow-hidden">
       {imgs.map((_, i) => (
         <div key={i} className="relative cursor-pointer overflow-hidden" onClick={() => onOpenLightbox(i)}>
-          <img src={src(i)} alt={`${placeName} ${i + 1}`} className="w-full h-full object-cover hover:scale-110 transition-transform duration-500" onError={() => handleError(i)} />
+          <Tile idx={i} alt={`${placeName} ${i + 1}`} className="w-full h-full object-cover hover:scale-110 transition-transform duration-500" />
           <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors" />
         </div>
       ))}
@@ -164,7 +182,7 @@ export function PlaceImageGrid({ images, placeName, onOpenLightbox }) {
     <div className="grid grid-cols-2 gap-1.5 h-64 rounded-2xl overflow-hidden">
       {imgs.map((_, i) => (
         <div key={i} className="relative cursor-pointer overflow-hidden" onClick={() => onOpenLightbox(i)}>
-          <img src={src(i)} alt={`${placeName} ${i + 1}`} className="w-full h-full object-cover hover:scale-110 transition-transform duration-500" onError={() => handleError(i)} />
+          <Tile idx={i} alt={`${placeName} ${i + 1}`} className="w-full h-full object-cover hover:scale-110 transition-transform duration-500" />
           {i === 3 && (
             <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
               <span className="text-white text-sm font-semibold flex items-center gap-1"><Grid size={14} /> View all</span>
@@ -180,7 +198,7 @@ export function PlaceImageGrid({ images, placeName, onOpenLightbox }) {
     <div className="grid grid-cols-4 grid-rows-2 gap-1.5 h-72 rounded-2xl overflow-hidden">
       {/* Hero — spans 2 cols + 2 rows */}
       <div className="col-span-2 row-span-2 relative cursor-pointer overflow-hidden" onClick={() => onOpenLightbox(0)}>
-        <img src={src(0)} alt={`${placeName} main`} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" onError={() => handleError(0)} />
+        <Tile idx={0} alt={`${placeName} main`} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
         <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors" />
       </div>
       {/* 4 smaller thumbnails */}
@@ -189,7 +207,7 @@ export function PlaceImageGrid({ images, placeName, onOpenLightbox }) {
         const isLast = j === 3 && imgs.length > 5;
         return (
           <div key={i} className="relative cursor-pointer overflow-hidden" onClick={() => onOpenLightbox(i)}>
-            <img src={src(i)} alt={`${placeName} ${i + 1}`} className="w-full h-full object-cover hover:scale-110 transition-transform duration-500" onError={() => handleError(i)} />
+            <Tile idx={i} alt={`${placeName} ${i + 1}`} className="w-full h-full object-cover hover:scale-110 transition-transform duration-500" />
             {isLast && (
               <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                 <span className="text-white text-sm font-bold">+{imgs.length - 4} more</span>
@@ -206,13 +224,13 @@ export function PlaceImageGrid({ images, placeName, onOpenLightbox }) {
 export function ImageLightbox({ images, placeName, startIndex = 0, onClose }) {
   const [current, setCurrent] = useState(startIndex);
   const [errors, setErrors] = useState({});
-  const fallback = 'https://portal-tourism.cgstate.gov.in/files/gangrel-bandh-image.webp';
+  const { t } = useLanguage();
 
-  const imgs = images && images.length > 0 ? images : [fallback];
+  const imgs = images && images.length > 0 ? images : [];
   const total = imgs.length;
 
   const handleError = idx => setErrors(e => ({ ...e, [idx]: true }));
-  const src = idx => errors[idx] ? fallback : imgs[idx];
+  const src = idx => imgs[idx];
 
   const prev = useCallback(() => setCurrent(c => (c - 1 + total) % total), [total]);
   const next = useCallback(() => setCurrent(c => (c + 1) % total), [total]);
@@ -248,14 +266,21 @@ export function ImageLightbox({ images, placeName, startIndex = 0, onClose }) {
 
       {/* Main image area */}
       <div className="flex-1 relative flex items-center justify-center px-16 min-h-0" onClick={e => e.stopPropagation()}>
-        <img
-          key={current}
-          src={src(current)}
-          alt={`${placeName} - photo ${current + 1}`}
-          className="max-h-full max-w-full object-contain rounded-lg shadow-2xl"
-          style={{ animation: 'lightboxFadeIn 0.2s ease-out' }}
-          onError={() => handleError(current)}
-        />
+        {total === 0 || errors[current] ? (
+          <div className="text-center text-gray-400">
+            <Camera size={48} className="mx-auto mb-3 opacity-50" />
+            <p className="text-sm">{t('place.photo-unavailable')}</p>
+          </div>
+        ) : (
+          <img
+            key={current}
+            src={src(current)}
+            alt={`${placeName} - photo ${current + 1}`}
+            className="max-h-full max-w-full object-contain rounded-lg shadow-2xl"
+            style={{ animation: 'lightboxFadeIn 0.2s ease-out' }}
+            onError={() => handleError(current)}
+          />
+        )}
 
         {/* Prev / Next */}
         {total > 1 && (

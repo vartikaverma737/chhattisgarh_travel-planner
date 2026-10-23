@@ -70,6 +70,7 @@ const en = {
   'place.plan-here': 'Plan Trip Here',
   'place.close': 'Close',
   'place.photo-unavailable': 'Photo unavailable',
+  'place.district-photo': 'Photo of {district}',
   'place.no-photos': 'No photos available for this place',
 
   'rec.for-you': 'Recommended for you',
@@ -431,6 +432,7 @@ const hi = {
   'place.plan-here': 'यहाँ यात्रा की योजना बनाएँ',
   'place.close': 'बंद करें',
   'place.photo-unavailable': 'फोटो उपलब्ध नहीं',
+  'place.district-photo': '{district} की तस्वीर',
   'place.no-photos': 'इस स्थान के लिए कोई फोटो उपलब्ध नहीं',
 
   'rec.for-you': 'आपके लिए सुझाव',
@@ -792,6 +794,7 @@ const cg = {
   'place.plan-here': 'इहाँ जतरा बनाव',
   'place.close': 'बंद करव',
   'place.photo-unavailable': 'फोटो नइ पावत',
+  'place.district-photo': '{district} के फोटो',
   'place.no-photos': 'ए जगह ला कउनो फोटो नइ हे',
 
   'rec.for-you': 'तोर ल लाय सुझाव',
